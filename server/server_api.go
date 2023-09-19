@@ -1,12 +1,8 @@
 // Leader approved actions. Called when message is recieved from leader
 
-package server_api
+package server
 
-import (
-	"fmt"
-)
-
-type server interface{
+type server interface {
 	create()
 	delete()
 	exists()
@@ -16,37 +12,39 @@ type server interface{
 	sync()
 }
 
-func create(path string, data[] string, flags[]string) string{
+func create(path string, data []string, flags []string) string {
 	// check path
-	if exists(path, watch=false){
-		getData()
-	}
-	else{
+	if exists(path, false) {
+		getData(path, false)
+	} else {
 		// create znodes locally
-		setData()
+		setData(path, data, 0)
 	}
+
+	return ""
 }
 
-func delete(path string, version int64){
-
-}
-
-func exists(path string, watch bool) bool{
-
-}
-
-func getData(path string, watch bool){
+func delete(path string, version int64) {
 
 }
 
-func setData(path string, data[]string, version int64){
-	
+func exists(path string, watch bool) bool {
+
+	return false
 }
 
-func getChildren(path string, watch bool){
+func getData(path string, watch bool) {
 
 }
 
-func sync(path string){
+func setData(path string, data []string, version int64) {
+
+}
+
+func getChildren(path string, watch bool) {
+
+}
+
+func sync(path string) {
 
 }
