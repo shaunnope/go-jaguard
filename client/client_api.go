@@ -1,10 +1,6 @@
-package client_api
+package client
 
-import (
-	"fmt"
-)
-
-type client interface{
+type client interface {
 	create()
 	delete()
 	exists()
@@ -14,34 +10,37 @@ type client interface{
 	sync()
 }
 
-func create(path string, data[] string, flags[]string) string{
+func create(path string, data []string, flags []string) string {
 	// marshal command + params
 	// send to server
 	// recieve from server
 	// unmarshal
 	// return to application
+
+	return ""
 }
 
-func delete(path string, version int64){
-
-}
-
-func exists(path string, watch bool) bool{
-
-}
-
-func getData(path string, watch bool){
+func delete(path string, version int64) {
 
 }
 
-func setData(path string, data[]string, version int64){
-	
+func exists(path string, watch bool) bool {
+
+	return false
 }
 
-func getChildren(path string, watch bool){
+func getData(path string, watch bool) {
 
 }
 
-func sync(path string){
+func setData(path string, data []string, version int64) {
+
+}
+
+func getChildren(path string, watch bool) {
+
+}
+
+func sync(path string) {
 
 }
