@@ -1,10 +1,12 @@
-package client_api
+// Leader approved actions. Called when message is recieved from leader
+
+package server_api
 
 import (
 	"fmt"
 )
 
-type client interface{
+type server interface{
 	create()
 	delete()
 	exists()
@@ -15,11 +17,14 @@ type client interface{
 }
 
 func create(path string, data[] string, flags[]string) string{
-	// marshal command + params
-	// send to server
-	// recieve from server
-	// unmarshal
-	// return to application
+	// check path
+	if exists(path, watch=false){
+		getData()
+	}
+	else{
+		// create znodes locally
+		setData()
+	}
 }
 
 func delete(path string, version int64){
