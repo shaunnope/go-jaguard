@@ -4,3 +4,10 @@ jaguard /ˈʤæˌɡɑːd/
 - _noun_: A Go implementation of ZooKeeper
 
 # Jaguard
+
+
+## Getting Started
+The `*.pb.go` files are currently ignored by git. To generate them, run
+```bash
+$ ./build.sh
+```
