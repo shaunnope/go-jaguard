@@ -1,17 +1,17 @@
 syntax = "proto3";
 option go_package = "github.com/shaunnope/go-jaguard/zouk";
 
-message AddServerRequest {
+message AddNodeRequest {
     string server = 1;
 }
 
-message AddServerResponse {}
+message AddNodeResponse {}
 
-message RemoveServerRequest {
+message RemoveNodeRequest {
     string server = 1;
 }
 
-message RemoveServerResponse {}
+message RemoveNodeResponse {}
 
 message CreateRequest {
     string path = 1;
@@ -22,9 +22,9 @@ message CreateRequest {
 message CreateResponse {}
 
 
-service Server {
-    rpc AddServer (AddServerRequest) returns (AddServerResponse);
-    rpc RemoveServer (RemoveServerRequest) returns (RemoveServerResponse);
+service Node {
+    rpc AddNode (AddNodeRequest) returns (AddNodeResponse);
+    rpc RemoveNode (RemoveNodeRequest) returns (RemoveNodeResponse);
     
     rpc Create(CreateRequest) returns (CreateResponse);
 }
