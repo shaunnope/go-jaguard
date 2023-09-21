@@ -12,7 +12,7 @@ type server interface {
 	sync()
 }
 
-func create(path string, data []string, flags []string) string {
+func create(path string, data []byte, flags []string) string {
 	// check path
 	if exists(path, false) {
 		getData(path, false)
