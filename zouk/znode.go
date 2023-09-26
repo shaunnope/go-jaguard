@@ -1,20 +1,20 @@
 package zouk
 
 type Stat struct {
-	czxid          int64
-	mzxid          int64
-	pzxid          int64
-	ctime          int64
-	mtime          int64
-	version        int64
-	cversion       int64
-	aversion       int64
-	ephemeralOwner int64
-	dataLength     int32
-	numChildren    int32
+	Czxid          int64 // created zxid
+	Mzxid          int64 // last modified zxid
+	Pzxid          int64 // last modified children
+	Ctime          int64 // created time
+	Mtime          int64 // last modified time
+	Version        int64 // version
+	Cversion       int64 // child version
+	Aversion       int64 // acl version
+	EphemeralOwner int64 // owner id if ephermeral, 0 otw
+	DataLength     int32 // length of the data in the node
+	NumChildren    int32 // number of children of this node
 }
 
-type znode struct {
+type Znode struct {
 
 	// remember to declare and assign array as slice
 	// example:
@@ -27,10 +27,10 @@ type znode struct {
 	// 	a := make([]string, 3)
 	// 	h.s = a
 	// }
-	stat     Stat
-	children []int64
-	parent   int64
-	data     []byte
-	eph      bool
-	id       int64
+	Stat     Stat
+	Children []int64
+	Parent   int64
+	Data     []byte
+	Eph      bool
+	Id       int64
 }
