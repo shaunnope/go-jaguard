@@ -4,7 +4,7 @@ assignmenttype = {{Jaguard}},
 assignment = {{}},
 name = {{Group 5}},
 studentnumber = {{Report}}
-]{writeup}
+]{style}
 
 \usepackage{parskip}
 %\setlength{\parindent}{0em}
@@ -13,4 +13,84 @@ studentnumber = {{Report}}
 
 \begin{document}
 
+\section{Problem Scope and Definition}
+\subsection{Problem}
+In a distributed system, it's essential to implement a locking mechanism to prevent multiple clients from editing the same item concurrently. At the same time, some clients may require notification of data changes. An example application is a platform like Reddit, where multiple clients add comments to a topic, and others wish to be notified of changes.
+
+\subsection{Some of the solutions}
+Traditional locking mechanisms can lead to issues such as busy waiting, where clients waste time waiting for access, and herd effects when multiple clients vie for the same lock. Additionally, polling-based notification solutions are inefficient, as they continuously check for updates even when none are available.
+
+\subsection{Why Zookeeper}
+To address these challenges, we propose implementing a Go-based system inspired by ZooKeeper. Similar to ZooKeeper, our system will employ a hierarchical structure to store information, incorporate znodes to enhance the locking mechanism using sequential nodes, and provide a watch function for client notifications, eliminating the need for busy waiting and preventing herd effects.
+
+In terms of correctness, clients can ensure they have the most up-to-date information due to notifications. We will further enhance correctness, reliability, and scalability by implementing the Zookeeper Atomic Broadcast (ZAB) which is a Paxos and Raft-like protocol for consensus, leader election, and replication in our implementation. If time allows, we may explore incorporating Practical Byzantine Fault Tolerance (PBFT).
+
+\subsection{Deliverables}
+In summary, our system will offer the following features:
+
+\begin{itemize}
+    \item Implementation of znodes and a data tree structure.
+    \item Linearizable write events
+    \item Protocol for leader election, consensus, and replication.
+    \item Fist in first out order for processing client requests using sequential nodes.
+    \item Client notifications when changes occur at target znodes using watches.
+    \item Fault tolerance
+\end{itemize}
+
+\section{Implementation Plan}
+
+We will use Go as the primary programming language, taking advantage of its performance and concurrency. We have identified the following components that we will be building from scratch to create our system and some of the existing packages.
+
+\subsection{Components to Be Implemented from Scratch}
+
+\begin{itemize}
+    \item Request Definition: We will design and define the structure of requests and how we will process them. 
+    \item Znode (Struct Implementation): We will replicate the hierarchical data structure and it will encapsulate the essential attributes and behaviours required for znodes in our system.
+    \item ZAB: We will implement the Raft consensus protocol from scratch and modify it to be like ZAB. 
+    \item Ephemeral Znodes and Session Management: We will develop a mechanism for managing ephemeral znodes gracefully when a client session ends. 
+\end{itemize}
+
+\subsection{Components to Be Reused}
+
+\begin{itemize}
+    \item gRPC for Communication: We will leverage the gRPC framework for efficient communication between different components and it simplifies the communication aspect of our implementation.
+    \item Session Package: While we will build session management logic from scratch, we would consider utilizing existing Go packages or libraries for certain aspects of session management, such as timeouts and session tracking.
+    \item Testing (Unit Tests): We will implement unit tests for our system to validate the correctness and functionality of each component. 
+\end{itemize}
+
+\section{Validation Plan}
+
+To validate our project, we will use Docker containers to simulate a distributed environment with ZooKeeper servers and clients. We planned to use Kubernetes for testing various scenarios. We intend to validate through the following:
+
+\subsection{Linearizable Write and Notification}
+\begin{itemize}
+    \item Two clients will concurrently attempt to write messages, and the messages should appear in the same order when read by all clients, demonstrating linearizable writing. Additionally, we will test notification mechanisms to ensure clients are promptly notified of changes.
+    \item The messages' order should be consistent across all clients, and notifications should occur as expected.
+\end{itemize}
+
+\subsection{FIFO Client Request}
+\begin{itemize}
+    \item A single client will repeatedly write and read from the same znode. Each read operation should reflect the most recent write because the requests are processed in the order they are received, showcasing FIFO client request handling.
+    \item The reads must consistently reflect the most recent write, and the order of operations should be maintained.
+\end{itemize}
+
+\subsection{Notification}
+\begin{itemize}
+    \item A client will set a watch for a specific topic, and another client will write a new change related to that topic. The client with the watch should receive a notification, demonstrating the effectiveness of our notification system.
+    \item The client with the watch should receive a timely notification when changes related to the watched topic occur.
+\end{itemize}
+
+\subsection{Fault Tolerance}
+\begin{itemize}
+    \item We will intentionally disrupt the ZooKeeper ensemble by killing the leader node. The system should detect this and re-elect a new leader. Additionally, we will introduce a new ZooKeeper server, and its log should be replicated seamlessly, ensuring fault tolerance and data consistency.
+    \item The system should detect leader node failure, re-elect a leader, and ensure log replication when introducing a new server.
+\end{itemize}
+
+\subsection{Byzantine Fault Tolerance (Optional)}
+\begin{itemize}
+    \item In an optional test for Byzantine Fault Tolerance, we will deploy 3f + 1 servers, where f represents adversarial servers. A client will attempt to read, and it should wait for f + 1 identical replies, all of which must be correct, demonstrating resilience to adversarial conditions.
+    \item The client should successfully wait for and receive f + 1 identical correct replies, showcasing Byzantine Fault Tolerance.
+\end{itemize}
+
+The above tests will be able to demonstrate the correctness, scalability and reliability of our implementation. 
 \end{document}
