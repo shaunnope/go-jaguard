@@ -13,13 +13,56 @@ message RemoveNodeRequest {
 
 message RemoveNodeResponse {}
 
+// base
 message CreateRequest {
     string path = 1;
     repeated bytes data = 2;
     string flags = 3;
+
 }
 
-message CreateResponse {}
+message CreateResponse {
+    optional bool accept = 1;
+    optional CreateRequest CR = 2;
+}
+
+message CreateRequest_Client {
+    CreateRequest request = 1;
+}
+message CreateResponse_Client {
+    optional bool OK = 1;
+    optional string message =2;
+}
+
+message CreateRequest_Announcement {
+    CreateRequest request = 1;
+}
+
+message CreateResponse_Announcement {
+    optional bool accept = 1;
+    optional CreateRequest CR = 2;
+}
+message CreateRequest_Proposal {
+    CreateRequest request = 1;
+}
+
+message CreateResponse_Proposal {
+    optional bool accept = 1;
+    optional CreateRequest CR = 2;
+}
+
+message CreateRequest {
+    string path = 1;
+    repeated bytes data = 2;
+    string flags = 3;
+    RequestType requestType =4;
+}
+enum RequestType{
+    PROPOSAL = 0;
+    ANNOUNCEMENT = 1;
+    CLIENT = 3;
+}
+
 
 enum Event {
     CONNECTED = 0;
@@ -34,6 +77,5 @@ enum Event {
 service Node {
     rpc AddNode (AddNodeRequest) returns (AddNodeResponse);
     rpc RemoveNode (RemoveNodeRequest) returns (RemoveNodeResponse);
-    
     rpc Create(CreateRequest) returns (CreateResponse);
 }
