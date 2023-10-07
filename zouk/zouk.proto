@@ -15,7 +15,7 @@ message RemoveNodeResponse {}
 
 message CreateRequest {
     string path = 1;
-    repeated bytes data = 2;
+    bytes data = 2;
     string flags = 3;
     RequestType requestType = 4;
 }

@@ -35,9 +35,9 @@ func main() {
 	// Contact the server and print out its response.
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	r, err := c.Create(ctx, &pb.CreateRequest{Path: "/home/folder1", Data: [][]byte{50}, Flags: "flag", RequestType: pb.RequestType_CLIENT})
+	r, err := c.Create(ctx, &pb.CreateRequest{Path: "/home/folder1", Data: []byte{1, 1, 1, 0}, Flags: "flag", RequestType: pb.RequestType_CLIENT})
 	if err != nil {
-		log.Fatalf("could not greet: %v", err)
+		log.Fatalf("err: %v", err)
 	}
 	log.Printf("Greeting: %b", r.Accept)
 }
