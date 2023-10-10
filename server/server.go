@@ -66,6 +66,7 @@ func (s *server) Create(ctx context.Context, in *pb.CreateRequest) (*pb.CreateRe
 			// todo verify version
 			// propose to all
 			for _, element := range other_servers {
+
 				// todo how to send to other IP?
 				r, err := s.Create(ctx, &pb.CreateRequest{
 					Path:        in.Path,
