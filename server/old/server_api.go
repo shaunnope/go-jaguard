@@ -37,7 +37,7 @@ func getData(path string, watch bool) {
 
 }
 
-func setData(path string, data []string, version int64) {
+func setData(path string, data []byte, version int64) {
 
 }
 
