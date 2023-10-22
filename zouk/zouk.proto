@@ -1,6 +1,7 @@
 syntax = "proto3";
 option go_package = "github.com/shaunnope/go-jaguard/zouk";
 
+// dynamic zookeeper nodes
 message AddNodeRequest {
     string server = 1;
 }
@@ -12,6 +13,26 @@ message RemoveNodeRequest {
 }
 
 message RemoveNodeResponse {}
+// end dynamic zookeeper nodes
+
+// election
+message Vote {
+    int32 lastZxid = 1;
+    int32 id = 2;
+}
+
+message ElectNotification {
+    Vote vote = 1;
+    int32 id = 2;
+    int32 state = 3;
+    int32 round = 4;
+}
+
+message ElectResponse {
+    int32 state = 1;
+}
+// end election
+
 
 message CreateRequest {
     string path = 1;
@@ -45,6 +66,8 @@ enum Event {
 service Node {
     rpc AddNode (AddNodeRequest) returns (AddNodeResponse);
     rpc RemoveNode (RemoveNodeRequest) returns (RemoveNodeResponse);
+
+    rpc Elect (ElectNotification) returns (ElectResponse);
     
     rpc Create(CreateRequest) returns (CreateResponse);
 }
