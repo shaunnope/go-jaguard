@@ -15,58 +15,50 @@ type Stat struct {
 }
 
 type Znode struct {
-	Stat        Stat
-	Children    map[string]bool
-	Parent      string
-	Data        []byte
-	Eph         bool
-	Id          int64
-	SequenceNum int64
+	stat        Stat
+	children    map[string]bool
+	parent      string
+	data        []byte
+	eph         bool
+	id          int64
+	sequenceNum int64
 }
 
 func NewNode(stat Stat, parent string, data []byte, isEphemeral bool, id int64, isSequence bool) Znode {
 	node := Znode{
-		Stat:     stat,
-		Children: map[string]bool{},
-		Parent:   parent,
-		Data:     data,
-		Eph:      isEphemeral,
+		stat:     stat,
+		children: map[string]bool{},
+		parent:   parent,
+		data:     data,
+		eph:      isEphemeral,
 		//TODO: What is Id for and how is the id of a znode determined
-		Id:          id,
-		SequenceNum: 0,
+		id:          id,
+		sequenceNum: 0,
 	}
 	return node
 }
 
 func (znode *Znode) AddChild(child string) map[string]bool {
-	znode.Children[child] = true
-	return znode.Children
+	znode.children[child] = true
+	return znode.children
 }
 
 func (znode *Znode) RemoveChild(child string) map[string]bool {
-	delete(znode.Children, child)
-	return znode.Children
+	delete(znode.children, child)
+	return znode.children
+}
+
+func (znode *Znode) ChildExists(childName string) bool {
+	_, exists := znode.children[childName]
+	return exists
 }
 
 func (znode *Znode) GetChildren() map[string]bool {
 	copyChildren := map[string]bool{}
-	for key, value := range znode.Children {
+	for key, value := range znode.children {
 		copyChildren[key] = value
 	}
 	return copyChildren
-}
-
-func (znode *Znode) GetData() []byte {
-	copiedData := make([]byte, len(znode.Data))
-	copy(copiedData, znode.Data)
-	return copiedData
-}
-
-func (znode *Znode) SetData(data []byte) []byte {
-	updatedData := make([]byte, len(data))
-	copy(updatedData, data)
-	znode.Data = updatedData
-	return data
 }
 
 func CreateStat(zxid int64, time int64, ephemeralOwner int64) Stat {
@@ -95,4 +87,44 @@ func CopyStat(stat Stat) Stat {
 		EphemeralOwner: stat.EphemeralOwner,
 	}
 	return copyStat
+}
+
+// IsEphemeral returns true if the Znode is ephemeral.
+func (znode *Znode) IsEphemeral() bool {
+	return znode.eph
+}
+
+// GetID returns the ID of the Znode.
+func (znode *Znode) GetID() int64 {
+	return znode.id
+}
+
+// GetSequenceNum returns the sequence number.
+func (znode *Znode) GetSequenceNum() int64 {
+	return znode.sequenceNum
+}
+
+// GetParent returns the parent path.
+func (znode *Znode) GetParent() string {
+	return znode.parent
+}
+
+// GetStat returns a copy of the stat.
+func (znode *Znode) GetStat() Stat {
+	return CopyStat(znode.stat)
+}
+
+// GetParent returns a copy of the data.
+func (znode *Znode) GetData() []byte {
+	copiedData := make([]byte, len(znode.data))
+	copy(copiedData, znode.data)
+	return copiedData
+}
+
+// SetData sets the data to a copy of the data input.
+func (znode *Znode) SetData(data []byte) []byte {
+	updatedData := make([]byte, len(data))
+	copy(updatedData, data)
+	znode.data = updatedData
+	return data
 }
