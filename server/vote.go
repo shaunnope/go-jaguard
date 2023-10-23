@@ -3,8 +3,10 @@ package main
 
 import pb "github.com/shaunnope/go-jaguard/zouk"
 
+type Vote = pb.VoteFragment
+
 type VoteLog struct {
-	Vote    *pb.Vote
+	Vote    Vote
 	Round   int
 	Version int
 }
