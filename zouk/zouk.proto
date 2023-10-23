@@ -1,6 +1,15 @@
 syntax = "proto3";
 option go_package = "github.com/shaunnope/go-jaguard/zouk";
 
+message Zxid {
+    int64 epoch = 1;
+    int64 counter = 2;
+}
+
+message Ping {
+    int64 from = 1;
+}
+
 // dynamic zookeeper nodes
 message AddNodeRequest {
     string server = 1;
@@ -17,19 +26,19 @@ message RemoveNodeResponse {}
 
 // election
 message Vote {
-    int32 lastZxid = 1;
-    int32 id = 2;
+    Zxid lastZxid = 1;
+    int64 id = 2;
 }
 
 message ElectNotification {
     Vote vote = 1;
-    int32 id = 2;
-    int32 state = 3;
-    int32 round = 4;
+    int64 id = 2;
+    int64 state = 3;
+    int64 round = 4;
 }
 
 message ElectResponse {
-    int32 state = 1;
+    int64 state = 1;
 }
 // end election
 
@@ -64,6 +73,8 @@ enum Event {
 
 
 service Node {
+    rpc SendPing (Ping) returns (Ping);
+
     rpc AddNode (AddNodeRequest) returns (AddNodeResponse);
     rpc RemoveNode (RemoveNodeRequest) returns (RemoveNodeResponse);
 

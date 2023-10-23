@@ -25,16 +25,18 @@ type StateVector struct {
 	Epoch    int
 	State    State
 	Round    int
-	LastZxid int
-	Vote     [2]int
-	Queue    chan VoteMsg
+	LastZxid Zxid
+	Vote     Vote
+	Queue    chan *VoteMsg
 
 	Connections map[int]*pb.NodeClient
 }
 
-func newStateVector() StateVector {
+func newStateVector(idx int) StateVector {
 	return StateVector{
-		Queue: make(chan VoteMsg, maxElectionNotifQueueSize),
+		Id:          idx,
+		Queue:       make(chan *VoteMsg, maxElectionNotifQueueSize),
+		Connections: make(map[int]*pb.NodeClient),
 	}
 }
 

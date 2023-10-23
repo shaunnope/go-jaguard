@@ -15,7 +15,7 @@ const (
 
 type Table map[int]VoteLog
 
-func (t Table) Put(key int, vote [2]int, round int) {
+func (t Table) Put(key int, vote Vote, round int) {
 	var version int
 	if val, ok := t[key]; ok && val.round == round {
 		version = t[key].version + 1
@@ -53,18 +53,17 @@ func (s *Server) ElectNotify(from int) *pb.ElectResponse {
 	s.EstablishConnection(from)
 
 	// send vote notif
-	// TODO: timeout
-	// NOTE: not quite sure what cancel() does
+	// TODO: adjust timeout value
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	msg := &pb.ElectNotification{
-		Id:    int32(s.Id),
-		State: int32(s.State),
+		Id:    int64(s.Id),
+		State: int64(s.State),
 		Vote: &pb.Vote{
-			LastZxid: int32(s.LastZxid),
-			Id:       int32(s.Id),
+			LastZxid: s.LastZxid.Raw(),
+			Id:       int64(s.Id),
 		},
-		Round: int32(s.Round),
+		Round: int64(s.Round),
 	}
 	r, err := (*s.Connections[from]).Elect(ctx, msg)
 	if err != nil {
@@ -85,19 +84,13 @@ func (s *Server) ElectBroadcast() {
 // Notification Receiver
 func (s *Server) Elect(ctx context.Context, in *pb.ElectNotification) (*pb.ElectResponse, error) {
 
-	msgVote := in.GetVote()
 	msgState := State(in.GetState())
 	from := int(in.GetId())
 
 	reply := false
 
 	if s.GetState() == ELECTION {
-		msg := VoteMsg{
-			vote:  [2]int{int(msgVote.LastZxid), int(msgVote.Id)},
-			id:    from,
-			state: msgState,
-			round: int(in.GetRound()),
-		}
+		msg := VoteMsgFrom(in)
 		s.Queue <- msg
 
 		reply = (msgState == ELECTION && msg.round < s.Round)
@@ -110,13 +103,13 @@ func (s *Server) Elect(ctx context.Context, in *pb.ElectNotification) (*pb.Elect
 		s.ElectNotify(from)
 	}
 
-	return &pb.ElectResponse{State: int32(s.State)}, nil
+	return &pb.ElectResponse{State: int64(s.State)}, nil
 }
 
 func (s *Server) FastElection(t0 int) Vote {
 	var timeout int = t0
 
-	// TODO: might deadlock
+	// NOTE: might deadlock
 	s.Lock()
 	defer s.Unlock()
 
@@ -129,10 +122,10 @@ func (s *Server) FastElection(t0 int) Vote {
 	s.IncRound(false)
 
 	// send vote requests to all other servers
-	// TODO: broadcast
+	s.ElectBroadcast()
 
 	for s.State == ELECTION {
-		var n VoteMsg
+		var n *VoteMsg
 		select {
 		case n = <-s.Queue:
 			// received vote
@@ -144,61 +137,61 @@ func (s *Server) FastElection(t0 int) Vote {
 					receivedVotes = make(map[int]VoteLog)
 
 					if n.vote.GreaterThan(Vote{s.LastZxid, s.Id}) {
-						s.Vote = n.vote
+						s.Vote = *n.vote
 					} else {
 						s.SetVote(false)
 					}
 					s.ElectBroadcast()
 				} else if n.round == s.Round && n.vote.GreaterThan(s.Vote) {
-					s.Vote = n.vote
+					s.Vote = *n.vote
 					s.ElectBroadcast()
 				} else if n.round < s.Round {
 					continue
 				}
 
-				receivedVotes.Put(n.id, n.vote, n.round)
+				receivedVotes.Put(n.id, *n.vote, n.round)
 				if len(receivedVotes) == len(config.Servers) {
-					s.DeduceLeader(s.Vote[1])
+					s.DeduceLeader(s.Vote.Id)
 					return s.Vote
 				} else if receivedVotes.HasQuorum(s.Vote) && len(s.Queue) > 0 {
 					time.Sleep(time.Duration(t0) * time.Millisecond)
 					if len(s.Queue) == 0 {
-						s.DeduceLeader(s.Vote[1])
+						s.DeduceLeader(s.Vote.Id)
 						return s.Vote
 					}
 				}
 
 			} else {
 				if n.round == s.Round {
-					receivedVotes.Put(n.id, n.vote, n.round)
+					receivedVotes.Put(n.id, *n.vote, n.round)
 					if n.state == LEADING {
-						s.DeduceLeader(n.vote[1])
-						return n.vote
+						s.DeduceLeader(n.vote.Id)
+						return *n.vote
 					}
-					hasQuorum := receivedVotes.HasQuorum(n.vote)
-					if n.vote[1] == s.Id && hasQuorum {
-						s.DeduceLeader(n.vote[1])
-						return n.vote
-					} else if _, ok := outOfElection[n.vote[1]]; hasQuorum && ok {
-						r := s.ElectNotify(n.vote[1])
-						if r.GetState() == int32(LEADING) {
-							s.DeduceLeader(n.vote[1])
-							return n.vote
+					hasQuorum := receivedVotes.HasQuorum(*n.vote)
+					if n.vote.Id == s.Id && hasQuorum {
+						s.DeduceLeader(n.vote.Id)
+						return *n.vote
+					} else if _, ok := outOfElection[n.vote.Id]; hasQuorum && ok {
+						r := s.ElectNotify(n.vote.Id)
+						if State(r.GetState()) == LEADING {
+							s.DeduceLeader(n.vote.Id)
+							return *n.vote
 						}
 					}
 				}
-				outOfElection.Put(n.id, n.vote, n.round)
-				hasQuorum := outOfElection.HasQuorum(n.vote)
-				if n.vote[1] == s.Id && hasQuorum {
+				outOfElection.Put(n.id, *n.vote, n.round)
+				hasQuorum := outOfElection.HasQuorum(*n.vote)
+				if n.vote.Id == s.Id && hasQuorum {
 					s.Round = n.round
-					s.DeduceLeader(n.vote[1])
-					return n.vote
-				} else if _, ok := outOfElection[n.vote[1]]; hasQuorum && ok {
-					r := s.ElectNotify(n.vote[1])
-					if r.GetState() == int32(LEADING) {
+					s.DeduceLeader(n.vote.Id)
+					return *n.vote
+				} else if _, ok := outOfElection[n.vote.Id]; hasQuorum && ok {
+					r := s.ElectNotify(n.vote.Id)
+					if State(r.GetState()) == LEADING {
 						s.Round = n.round
-						s.DeduceLeader(n.vote[1])
-						return n.vote
+						s.DeduceLeader(n.vote.Id)
+						return *n.vote
 					}
 				}
 			}
@@ -210,5 +203,5 @@ func (s *Server) FastElection(t0 int) Vote {
 		}
 	}
 
-	return Vote{-1, -1}
+	return Vote{Id: -1}
 }

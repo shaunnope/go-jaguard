@@ -1,7 +1,12 @@
 // Vote related definitions
 package main
 
-type Vote [2]int
+import pb "github.com/shaunnope/go-jaguard/zouk"
+
+type Vote struct {
+	LastZxid Zxid
+	Id       int
+}
 
 type VoteLog struct {
 	vote    Vote
@@ -10,20 +15,37 @@ type VoteLog struct {
 }
 
 type VoteMsg struct {
-	vote  Vote
+	vote  *Vote
 	id    int
 	state State
 	round int
 }
 
 func (v *Vote) LessThan(other Vote) bool {
-	return v[0] < other[0] || (v[0] == other[0] && v[1] < other[1])
+	return v.LastZxid.LessThan(other.LastZxid) || (v.LastZxid.Equal(other.LastZxid) && v.Id < other.Id)
 }
 
 func (v *Vote) Equal(other Vote) bool {
-	return v[0] == other[0] && v[1] == other[1]
+	return v.LastZxid.Equal(other.LastZxid) && v.Id == other.Id
 }
 
 func (v *Vote) GreaterThan(other Vote) bool {
-	return v[0] > other[0] || (v[0] == other[0] && v[1] > other[1])
+	return !v.LessThan(other) && !v.Equal(other)
+}
+
+func VoteFrom(raw *pb.Vote) *Vote {
+	return &Vote{LastZxid: *ZxidFrom(raw.LastZxid), Id: int(raw.Id)}
+}
+
+func (v *Vote) Raw() *pb.Vote {
+	return &pb.Vote{LastZxid: v.LastZxid.Raw(), Id: int64(v.Id)}
+}
+
+func VoteMsgFrom(in *pb.ElectNotification) *VoteMsg {
+	return &VoteMsg{
+		vote:  VoteFrom(in.Vote),
+		id:    int(in.Id),
+		state: State(in.State),
+		round: int(in.Round),
+	}
 }
