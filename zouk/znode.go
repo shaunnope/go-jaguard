@@ -15,22 +15,69 @@ type Stat struct {
 }
 
 type Znode struct {
-
-	// remember to declare and assign array as slice
-	// example:
-	// type house struct {
-	// 	s []string
-	// }
-
-	// func main() {
-	// 	h := house{}
-	// 	a := make([]string, 3)
-	// 	h.s = a
-	// }
 	Stat     Stat
-	Children []int64
-	Parent   int64
+	Children map[string]bool
+	Parent   string
 	Data     []byte
 	Eph      bool
 	Id       int64
+}
+
+func (znode *Znode) AddChild(child string) map[string]bool {
+	znode.Children[child] = true
+	return znode.Children
+}
+
+func (znode *Znode) RemoveChild(child string) map[string]bool {
+	delete(znode.Children, child)
+	return znode.Children
+}
+
+func (znode *Znode) GetChildren() map[string]bool {
+	copyChildren := map[string]bool{}
+	for key, value := range znode.Children {
+		copyChildren[key] = value
+	}
+	return copyChildren
+}
+
+func (znode *Znode) GetData() []byte {
+	copiedData := make([]byte, len(znode.Data))
+	copy(copiedData, znode.Data)
+	return copiedData
+}
+
+func (znode *Znode) SetData(data []byte) []byte {
+	updatedData := make([]byte, len(data))
+	copy(updatedData, data)
+	znode.Data = updatedData
+	return data
+}
+
+func CreateStat(zxid int64, time int64, ephemeralOwner int64) Stat {
+	stat := Stat{
+		Czxid:          zxid,
+		Mzxid:          zxid,
+		Pzxid:          zxid,
+		Ctime:          time,
+		Mtime:          time,
+		Cversion:       0,
+		Aversion:       0,
+		EphemeralOwner: ephemeralOwner,
+	}
+	return stat
+}
+
+func CopyStat(stat Stat) Stat {
+	copyStat := Stat{
+		Czxid:          stat.Czxid,
+		Mzxid:          stat.Mzxid,
+		Pzxid:          stat.Pzxid,
+		Ctime:          stat.Ctime,
+		Mtime:          stat.Mtime,
+		Cversion:       stat.Cversion,
+		Aversion:       stat.Aversion,
+		EphemeralOwner: stat.EphemeralOwner,
+	}
+	return copyStat
 }
