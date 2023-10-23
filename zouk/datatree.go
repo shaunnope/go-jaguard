@@ -11,6 +11,10 @@ type DataTree struct {
 	NodeMap map[string]*Znode
 }
 
+//TODO: Utility print functions for a node + all nodes in data tree
+//TODO: Confirm parent only deleted if child is deleted data struct
+//TODO: Lock for changing node type
+
 func NewDataTree() DataTree {
 	rootNode := Znode{
 		//TODO: Change zxid and ephemeral owner
@@ -24,33 +28,51 @@ func NewDataTree() DataTree {
 
 	dataTree := DataTree{
 		NodeMap: map[string]*Znode{
-			"/root": &rootNode,
+			"/": &rootNode,
 		},
 	}
 
 	return dataTree
 }
 
-func (dataTree *DataTree) CreateNode(path string, data []byte, ephermeralOwner int64, time int64, zxid int64) (string, error) {
+func (dataTree *DataTree) CreateNode(path string, data []byte, isEph bool, ephermeralOwner int64, time int64, zxid int64, isSequence bool) (string, error) {
+
 	fmt.Printf("Inside CreateNode, data: %d\n", data)
 	lastSlashIndex := strings.LastIndex(path, "/")
-	parentName := path[:lastSlashIndex]
-	childName := path[lastSlashIndex:]
-	// fmt.Printf("lastslashindex{%d}, parentName{%s}, childName:{%s}\n", lastSlashIndex, parentName, childName)
-	stat := CreateStat(zxid, time, ephermeralOwner)
+	var parentName string
+	if lastSlashIndex == 0 {
+		parentName = "/"
+	} else {
+		parentName = path[:lastSlashIndex]
+	}
+
+	// Check if parent node is ephemeral, return error if ephemeral
 	parentNode, ok := dataTree.NodeMap[parentName]
 	if !ok {
 		return parentName, errors.New("invalid parent name")
 	}
+	if parentNode.Eph {
+		fmt.Printf("%s cannot have a child node as it is ephemeral", parentName)
+		return parentName, errors.New("invalid parent name")
+	}
+
+	if isSequence {
+		i := parentNode.SequenceNum
+		parentNode.SequenceNum += 1
+		padded := fmt.Sprintf("%010d", i)
+		path += padded
+	}
+
+	childName := path[lastSlashIndex:]
+	// fmt.Printf("lastslashindex{%d}, parentName{%s}, childName:{%s}\n", lastSlashIndex, parentName, childName)
+	stat := CreateStat(zxid, time, ephermeralOwner)
+
 	children := parentNode.GetChildren()
 	_, ok = children[childName] // check for existence
 	if ok {
 		return childName, errors.New("invalid children as it already exists")
 	}
-	childNode := Znode{
-		Data: data,
-		Stat: stat,
-	}
+	childNode := NewNode(stat, parentName, data, isEph, 0, isSequence)
 	parentNode.AddChild(childName)
 	dataTree.NodeMap[path] = &childNode
 	return path, nil

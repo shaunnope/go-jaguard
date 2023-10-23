@@ -15,12 +15,27 @@ type Stat struct {
 }
 
 type Znode struct {
-	Stat     Stat
-	Children map[string]bool
-	Parent   string
-	Data     []byte
-	Eph      bool
-	Id       int64
+	Stat        Stat
+	Children    map[string]bool
+	Parent      string
+	Data        []byte
+	Eph         bool
+	Id          int64
+	SequenceNum int64
+}
+
+func NewNode(stat Stat, parent string, data []byte, isEphemeral bool, id int64, isSequence bool) Znode {
+	node := Znode{
+		Stat:     stat,
+		Children: map[string]bool{},
+		Parent:   parent,
+		Data:     data,
+		Eph:      isEphemeral,
+		//TODO: What is Id for and how is the id of a znode determined
+		Id:          id,
+		SequenceNum: 0,
+	}
+	return node
 }
 
 func (znode *Znode) AddChild(child string) map[string]bool {
