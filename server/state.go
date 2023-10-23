@@ -25,9 +25,9 @@ type StateVector struct {
 	Epoch    int
 	State    State
 	Round    int
-	LastZxid Zxid
-	Vote     Vote
-	Queue    chan *VoteMsg
+	LastZxid *pb.Zxid
+	Vote     *pb.Vote
+	Queue    chan VoteMsg
 
 	Connections map[int]*pb.NodeClient
 }
@@ -35,7 +35,7 @@ type StateVector struct {
 func newStateVector(idx int) StateVector {
 	return StateVector{
 		Id:          idx,
-		Queue:       make(chan *VoteMsg, maxElectionNotifQueueSize),
+		Queue:       make(chan VoteMsg, maxElectionNotifQueueSize),
 		Connections: make(map[int]*pb.NodeClient),
 	}
 }
@@ -59,10 +59,10 @@ func (sv *StateVector) SetVote(atomic bool) {
 		sv.Lock()
 		defer sv.Unlock()
 	}
-	sv.Vote = Vote{sv.LastZxid, sv.Id}
+	sv.Vote = &pb.Vote{LastZxid: sv.LastZxid, Id: int64(sv.Id)}
 }
 
-func (sv *StateVector) GetVote() Vote {
+func (sv *StateVector) GetVote() *pb.Vote {
 	sv.Lock()
 	defer sv.Unlock()
 	return sv.Vote
