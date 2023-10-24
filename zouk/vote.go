@@ -6,7 +6,7 @@ type VoteFragment struct {
 }
 
 func (v *Vote) Data() VoteFragment {
-	return VoteFragment{v.LastZxid.Data(), int(v.Id)}
+	return VoteFragment{v.LastZxid.Extract(), int(v.Id)}
 }
 
 func (v VoteFragment) LessThan(other VoteFragment) bool {

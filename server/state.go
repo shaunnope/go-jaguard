@@ -19,17 +19,27 @@ const (
 	FOLLOWING
 )
 
+type ZabLeader struct {
+	FollowerEpochs map[int]int
+	HasQuorum      chan bool
+}
+
 type StateVector struct {
 	mu.Mutex
 	Id       int
-	Epoch    int
 	State    State
 	Round    int
-	LastZxid pb.ZxidFragment
+	LastZxid pb.ZxidFragment // last proposal
 	Vote     Vote
 	Queue    chan VoteMsg
 
 	Connections map[int]*pb.NodeClient
+
+	History       []Transaction
+	AcceptedEpoch int // last NewEpoch
+	CurrentEpoch  int // last NewLeader
+
+	Leader ZabLeader
 }
 
 func newStateVector(idx int) StateVector {
@@ -37,6 +47,7 @@ func newStateVector(idx int) StateVector {
 		Id:          idx,
 		Queue:       make(chan VoteMsg, maxElectionNotifQueueSize),
 		Connections: make(map[int]*pb.NodeClient),
+		Leader:      ZabLeader{FollowerEpochs: make(map[int]int)},
 	}
 }
 

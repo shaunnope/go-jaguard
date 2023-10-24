@@ -90,10 +90,9 @@ func (s *Server) Elect(ctx context.Context, in *pb.ElectNotification) (*pb.Elect
 	reply := false
 
 	if s.GetState() == ELECTION {
-		var msg VoteMsg = in
-		s.Queue <- msg
+		s.Queue <- in
 
-		reply = (msgState == ELECTION && int(msg.Round) < s.Round)
+		reply = (msgState == ELECTION && int(in.Round) < s.Round)
 
 	} else {
 		reply = msgState == ELECTION

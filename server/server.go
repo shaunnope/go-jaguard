@@ -48,8 +48,8 @@ type Server struct {
 }
 
 func (s *Server) SendPing(ctx context.Context, in *pb.Ping) (*pb.Ping, error) {
-	log.Printf("%d received ping from %d", s.Id, in.From)
-	return &pb.Ping{From: int64(s.Id)}, nil
+	log.Printf("%d received ping from %d", s.Id, in.Data)
+	return &pb.Ping{Data: int64(s.Id)}, nil
 }
 
 // Establish connection to another server
@@ -65,48 +65,14 @@ func (s *Server) EstablishConnection(to int) {
 	}
 }
 
-func (s *Server) Serve() {
+func (s *Server) Serve(grpc *grpc.Server) {
 	time.Sleep(1000 * time.Millisecond)
 	// vote := s.FastElection(*maxTimeout)
 	// log.Printf("%d results: %v", s.Id, vote)
 
-	s.Lock()
-	if s.Id == len(config.Servers)-1 {
-		s.State = LEADING
-		// s.Vote = Vote{0, s.Id}
-		s.Vote = Vote{Id: s.Id}
-		log.Printf("server %d is leader", s.Id)
-	} else {
-		s.State = FOLLOWING
-		s.Vote = Vote{Id: len(config.Servers) - 1}
-		log.Printf("server %d is following %v", s.Id, s.Vote)
-	}
-	s.Unlock()
+	s.BasicPing()
 
-	for {
-		state := s.GetState()
-		switch state {
-		case LEADING:
-			for idx := range config.Servers {
-				if idx == s.Id {
-					continue
-				}
-				s.EstablishConnection(idx)
-				go func() {
-					ctx, cancel := context.WithTimeout(context.Background(), timeout)
-					defer cancel()
-					msg := &pb.Ping{From: int64(s.Id)}
-					r, err := (*s.Connections[idx]).SendPing(ctx, msg)
-					if err != nil {
-						log.Printf("%d error sending ping to %d: %v", s.Id, idx, err)
-					}
-					log.Printf("%d received ack %d", s.Id, r.From)
-				}()
-				time.Sleep(1000 * time.Millisecond)
-			}
-
-		}
-	}
+	grpc.GracefulStop()
 }
 
 func newNode(idx int) *Server {
@@ -126,7 +92,7 @@ func Run(idx int) {
 	log.Printf("server %d listening at %v", idx, lis.Addr())
 
 	// start server routines
-	go node.Serve()
+	go node.Serve(grpc_s)
 
 	// start grpc server (blocking)
 	if err := grpc_s.Serve(lis); err != nil {

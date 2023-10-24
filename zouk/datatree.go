@@ -15,12 +15,12 @@ type DataTree struct {
 func NewDataTree() *DataTree {
 	rootNode := &Znode{
 		//TODO: Change zxid and ephemeral owner
-		stat:     CreateStat(0, time.Now().Unix(), 0),
-		children: map[string]bool{},
-		parent:   "/",
-		data:     []byte{},
-		eph:      false,
-		id:       0,
+		Stat:     CreateStat(ZxidFragment{}, time.Now().Unix(), 0),
+		Children: map[string]bool{},
+		Parent:   "/",
+		Data:     []byte{},
+		Eph:      false,
+		Id:       0,
 	}
 
 	dataTree := DataTree{
@@ -32,7 +32,7 @@ func NewDataTree() *DataTree {
 	return &dataTree
 }
 
-func (dataTree *DataTree) CreateNode(path string, data []byte, isEph bool, ephermeralOwner int64, zxid int64, isSequence bool) (string, error) {
+func (dataTree *DataTree) CreateNode(path string, data []byte, isEph bool, ephermeralOwner int64, zxid ZxidFragment, isSequence bool) (string, error) {
 	fmt.Printf("Inside CreateNode, data: %d\n", data)
 
 	lastSlashIndex := strings.LastIndex(path, "/")
@@ -73,7 +73,7 @@ func (dataTree *DataTree) DeleteNode(path string, zxid int64) (string, error) {
 	if !ok {
 		return path, errors.New("node does not exist")
 	}
-	if len(nodeToDelete.children) > 0 {
+	if len(nodeToDelete.Children) > 0 {
 		return path, errors.New("node not empty")
 	}
 
@@ -95,7 +95,7 @@ func (dataTree *DataTree) DeleteNode(path string, zxid int64) (string, error) {
 	return "Removed", nil
 }
 
-func (dataTree *DataTree) SetData(path string, data []byte, version int64, zxid int64) Stat {
+func (dataTree *DataTree) SetData(path string, data []byte, version int64, zxid ZxidFragment) Stat {
 	node := dataTree.NodeMap[path]
 	node.SetData(data)
 
@@ -123,8 +123,8 @@ func getParentName(path string, lastSlashIndex int) string {
 
 // Helper function to add a sequence number to the path.
 func addSequenceNumber(parentNode *Znode, path string, isSequence bool) string {
-	i := parentNode.sequenceNum
-	parentNode.sequenceNum++
+	i := parentNode.SequenceNum
+	parentNode.SequenceNum++
 	padded := fmt.Sprintf("%010d", i)
 	return path + padded
 }

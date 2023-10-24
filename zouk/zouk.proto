@@ -6,8 +6,16 @@ message Zxid {
     int64 counter = 2;
 }
 
+message Transaction {
+    Zxid zxid = 1;
+    string path = 2;
+    bytes data = 3;
+    string flags = 4;
+    int64 type = 5;
+}
+
 message Ping {
-    int64 from = 1;
+    int64 data = 1;
 }
 
 // dynamic zookeeper nodes
@@ -41,6 +49,26 @@ message ElectResponse {
     int64 state = 1;
 }
 // end election
+
+// zab
+message FollowerInfo {
+    int64 id = 1;
+    Zxid lastZxid = 2;
+}
+
+message NewEpoch {
+    int64 epoch = 1;
+}
+
+message AckEpoch {
+    int64 currentEpoch = 1;
+    repeated Transaction history = 2;
+    Zxid lastZxid = 3;
+}
+
+
+
+// end zab
 
 
 message CreateRequest {
@@ -79,6 +107,9 @@ service Node {
     rpc RemoveNode (RemoveNodeRequest) returns (RemoveNodeResponse);
 
     rpc Elect (ElectNotification) returns (ElectResponse);
+
+    rpc InformLeader (FollowerInfo) returns (Ping);
+    rpc ProposeEpoch (NewEpoch) returns (AckEpoch);
     
     rpc Create(CreateRequest) returns (CreateResponse);
 }
