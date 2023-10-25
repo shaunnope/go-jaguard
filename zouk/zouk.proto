@@ -66,8 +66,6 @@ message AckEpoch {
     Zxid lastZxid = 3;
 }
 
-
-
 // end zab
 
 
@@ -90,14 +88,6 @@ enum RequestType{
 }
 
 
-enum Event {
-    CONNECTED = 0;
-    DISCONNECTED = 1;
-    CONNECTION_LOST = 2;
-    SESSION_EXPIRED = 3;
-    AUTH_FAILED = 4;
-    CLOSE = 5;
-}
 
 
 service Node {
