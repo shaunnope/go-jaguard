@@ -50,11 +50,10 @@ func (s *Server) ElectNotify(from int) *pb.ElectResponse {
 		return nil
 	}
 	// establish connection
-	s.EstablishConnection(from)
+	ctx, cancel := s.EstablishConnection(from, *maxTimeout)
 
 	// send vote notif
 	// TODO: adjust timeout value
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	msg := &pb.ElectNotification{
 		Id:    int64(s.Id),

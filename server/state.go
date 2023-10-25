@@ -40,6 +40,9 @@ type StateVector struct {
 	CurrentEpoch  int // last NewLeader
 
 	Leader ZabLeader
+
+	// TODO: save data tree to disk
+	Data *pb.DataTree
 }
 
 func newStateVector(idx int) StateVector {
@@ -48,6 +51,7 @@ func newStateVector(idx int) StateVector {
 		Queue:       make(chan VoteMsg, maxElectionNotifQueueSize),
 		Connections: make(map[int]*pb.NodeClient),
 		Leader:      ZabLeader{FollowerEpochs: make(map[int]int)},
+		Data:        pb.NewDataTree(),
 	}
 }
 

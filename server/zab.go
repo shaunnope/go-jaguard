@@ -39,7 +39,7 @@ func (s *Server) ProposeEpoch(ctx context.Context, in *pb.NewEpoch) (*pb.AckEpoc
 		return res, nil
 	}
 
-	defer s.FastElection(int(timeout))
+	defer s.FastElection(*maxTimeout)
 
 	// goto phase 2
 
@@ -52,8 +52,7 @@ func (s *Server) Discovery() {
 
 	switch s.State {
 	case FOLLOWING:
-		s.EstablishConnection(s.Vote.Id)
-		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		ctx, cancel := s.EstablishConnection(s.Vote.Id, *maxTimeout)
 		defer cancel()
 		msg := &pb.FollowerInfo{Id: int64(s.Id), LastZxid: &pb.Zxid{Epoch: int64(s.AcceptedEpoch), Counter: -1}}
 		_, err := (*s.Connections[s.Vote.Id]).InformLeader(ctx, msg)
@@ -71,8 +70,7 @@ func (s *Server) Discovery() {
 		}
 		mostRecent := &pb.AckEpoch{CurrentEpoch: -1, History: nil, LastZxid: &pb.Zxid{Epoch: -1, Counter: -1}}
 		for idx := range s.Leader.FollowerEpochs {
-			s.EstablishConnection(idx)
-			ctx, cancel := context.WithTimeout(context.Background(), timeout)
+			ctx, cancel := s.EstablishConnection(idx, *maxTimeout)
 			defer cancel()
 			msg := &pb.NewEpoch{Epoch: int64(maxEpoch + 1)}
 			r, err := (*s.Connections[idx]).ProposeEpoch(ctx, msg)

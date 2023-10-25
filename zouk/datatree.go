@@ -3,8 +3,13 @@ package zouk
 import (
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"time"
+)
+
+const (
+	PATH_SEP = "/"
 )
 
 type DataTree struct {
@@ -17,7 +22,7 @@ func NewDataTree() *DataTree {
 		//TODO: Change zxid and ephemeral owner
 		Stat:     CreateStat(ZxidFragment{}, time.Now().Unix(), 0),
 		Children: map[string]bool{},
-		Parent:   "/",
+		Parent:   PATH_SEP,
 		Data:     []byte{},
 		Eph:      false,
 		Id:       0,
@@ -25,7 +30,7 @@ func NewDataTree() *DataTree {
 
 	dataTree := DataTree{
 		NodeMap: map[string]*Znode{
-			"/": rootNode,
+			PATH_SEP: rootNode,
 		},
 	}
 
@@ -33,9 +38,12 @@ func NewDataTree() *DataTree {
 }
 
 func (dataTree *DataTree) CreateNode(path string, data []byte, isEph bool, ephermeralOwner int64, zxid ZxidFragment, isSequence bool) (string, error) {
-	fmt.Printf("Inside CreateNode, data: %d\n", data)
+	log.Printf("Inside CreateNode, data: %d\n", data)
 
-	lastSlashIndex := strings.LastIndex(path, "/")
+	lastSlashIndex := strings.LastIndex(path, PATH_SEP)
+	if lastSlashIndex == -1 {
+		return path, errors.New("invalid path")
+	}
 	parentName := getParentName(path, lastSlashIndex)
 
 	// Check if parent node is ephemeral, return error if ephemeral
@@ -44,7 +52,7 @@ func (dataTree *DataTree) CreateNode(path string, data []byte, isEph bool, epher
 		return parentName, errors.New("invalid parent name")
 	}
 	if parentNode.IsEphemeral() {
-		fmt.Printf("%s cannot have a child node as it is ephemeral", parentName)
+		log.Printf("%s cannot have a child node as it is ephemeral", parentName)
 		return parentName, errors.New("invalid parent name")
 	}
 
@@ -77,7 +85,7 @@ func (dataTree *DataTree) DeleteNode(path string, zxid int64) (string, error) {
 		return path, errors.New("node not empty")
 	}
 
-	lastSlashIndex := strings.LastIndex(path, "/")
+	lastSlashIndex := strings.LastIndex(path, PATH_SEP)
 	parentName := path[:lastSlashIndex]
 	childName := path[lastSlashIndex:]
 	parentNode, ok := dataTree.NodeMap[parentName]
@@ -116,7 +124,7 @@ func (dataTree *DataTree) GetData(path string) []byte {
 // Helper function to extract the parent name from a path.
 func getParentName(path string, lastSlashIndex int) string {
 	if lastSlashIndex == 0 {
-		return "/"
+		return PATH_SEP
 	}
 	return path[:lastSlashIndex]
 }

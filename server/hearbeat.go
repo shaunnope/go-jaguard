@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"log"
 	"sync"
 	"time"
@@ -22,8 +21,7 @@ func (s *Server) Heartbeat() {
 					continue
 				}
 				go func(i int) {
-					s.EstablishConnection(i)
-					ctx, cancel := context.WithTimeout(context.Background(), timeout)
+					ctx, cancel := s.EstablishConnection(i, *maxTimeout)
 					defer cancel()
 					msg := &pb.Ping{Data: int64(s.Id)}
 					_, err := (*s.Connections[i]).SendPing(ctx, msg)
@@ -52,8 +50,7 @@ func (s *Server) Heartbeat() {
 			// 	return
 			// }
 
-			s.EstablishConnection(s.Vote.Id)
-			ctx, cancel := context.WithTimeout(context.Background(), timeout)
+			ctx, cancel := s.EstablishConnection(s.Vote.Id, *maxTimeout)
 			defer cancel()
 			msg := &pb.Ping{Data: int64(s.Id)}
 			_, err := (*s.Connections[s.Vote.Id]).SendPing(ctx, msg)
@@ -68,6 +65,6 @@ func (s *Server) Heartbeat() {
 
 		}
 
-		time.Sleep(timeout)
+		time.Sleep(time.Duration(*maxTimeout) * time.Millisecond)
 	}
 }
