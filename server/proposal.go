@@ -16,19 +16,32 @@ func (s *Server) Create(ctx context.Context, in *pb.CreateRequest) (*pb.CreateRe
 		// if leader, send announcement, do nothing with response (rpc)
 		// if follower send proposal reply, do nothing with response (rpc)
 		if isLeader {
-			r, err := s.Create(ctx, &pb.CreateRequest{
-				Path:        in.Path,
-				Data:        in.Data,
-				Flags:       in.Flags,
-				RequestType: pb.RequestType_ANNOUNCEMENT})
-			if err != nil || *r.Accept {
-				log.Fatalf("err: %v", err)
+			for idx := range config.Servers {
+				if idx == s.Id {
+					continue
+				}
+				go func(i int) {
+					newCtx, cancel := s.EstablishConnection(i, *maxTimeout)
+					defer cancel()
+
+					r, err := (*s.Connections[i]).Create(newCtx, &pb.CreateRequest{
+						Path:        in.Path,
+						Data:        in.Data,
+						Flags:       in.Flags,
+						RequestType: pb.RequestType_ANNOUNCEMENT})
+					if err != nil || *r.Accept {
+						log.Fatalf("err: %v", err)
+					}
+				}(idx)
 			}
+
 		} else {
 			// forward to leader
 			// TODO: verify version
+			newCtx, cancel := s.EstablishConnection(s.Vote.Id, *maxTimeout)
+			defer cancel()
 
-			r, err := s.Create(ctx, &pb.CreateRequest{
+			r, err := (*s.Connections[s.Vote.Id]).Create(newCtx, &pb.CreateRequest{
 				Path:        in.Path,
 				Data:        in.Data,
 				Flags:       in.Flags,
@@ -56,8 +69,7 @@ func (s *Server) Create(ctx context.Context, in *pb.CreateRequest) (*pb.CreateRe
 				if idx == s.Id {
 					continue
 				}
-				s.EstablishConnection(idx)
-				newCtx, cancel := context.WithTimeout(context.Background(), timeout)
+				newCtx, cancel := s.EstablishConnection(idx, *maxTimeout)
 				defer cancel()
 
 				r, err := (*s.Connections[idx]).Create(newCtx, &pb.CreateRequest{
@@ -71,8 +83,9 @@ func (s *Server) Create(ctx context.Context, in *pb.CreateRequest) (*pb.CreateRe
 			}
 		} else {
 			// todo verify version
-
-			r, err := s.Create(ctx, &pb.CreateRequest{
+			newCtx, cancel := s.EstablishConnection(s.Vote.Id, *maxTimeout)
+			defer cancel()
+			r, err := (*s.Connections[s.Vote.Id]).Create(newCtx, &pb.CreateRequest{
 				Path:        in.Path,
 				Data:        in.Data,
 				Flags:       in.Flags,
