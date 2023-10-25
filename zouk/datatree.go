@@ -17,10 +17,10 @@ func NewDataTree() *DataTree {
 		//TODO: Change zxid and ephemeral owner
 		stat:     CreateStat(0, time.Now().Unix(), 0),
 		children: map[string]bool{},
-		parent:   "/",
+		parent:   "",
 		data:     []byte{},
 		eph:      false,
-		id:       0,
+		id:       "/",
 	}
 
 	dataTree := DataTree{
@@ -32,9 +32,16 @@ func NewDataTree() *DataTree {
 	return &dataTree
 }
 
-func (dataTree *DataTree) CreateNode(path string, data []byte, isEph bool, ephermeralOwner int64, zxid int64, isSequence bool) (string, error) {
-	fmt.Printf("Inside CreateNode, data: %d\n", data)
+// .
+// .
+// .
+// .
+// .
+// .
+//// Basic Operations
 
+// CreateNode creates a node by its path.
+func (dataTree *DataTree) CreateNode(path string, data []byte, isEph bool, ephermeralOwner int64, zxid int64, isSequence bool) (string, error) {
 	lastSlashIndex := strings.LastIndex(path, "/")
 	parentName := getParentName(path, lastSlashIndex)
 
@@ -60,9 +67,10 @@ func (dataTree *DataTree) CreateNode(path string, data []byte, isEph bool, epher
 
 	// fmt.Printf("lastslashindex{%d}, parentName{%s}, childName:{%s}\n", lastSlashIndex, parentName, childName)
 	stat := CreateStat(zxid, time.Now().Unix(), ephermeralOwner)
-	childNode := NewNode(stat, parentName, data, isEph, 0, isSequence)
+	childNode := NewNode(stat, parentName, data, isEph, path, isSequence)
 	parentNode.AddChild(childName)
 	dataTree.NodeMap[path] = &childNode
+	// fmt.Printf("Inside CreateNode, parentName:%s, childName:%s, data: %d\n", parentName, childName, data)
 
 	return path, nil
 }
@@ -95,6 +103,7 @@ func (dataTree *DataTree) DeleteNode(path string, zxid int64) (string, error) {
 	return "Removed", nil
 }
 
+// SetData sets the data of a node by its path.
 func (dataTree *DataTree) SetData(path string, data []byte, version int64, zxid int64) Stat {
 	node := dataTree.NodeMap[path]
 	node.SetData(data)
@@ -108,10 +117,128 @@ func (dataTree *DataTree) SetData(path string, data []byte, version int64, zxid 
 	return outStat
 }
 
-func (dataTree *DataTree) GetData(path string) []byte {
-	node := dataTree.NodeMap[path]
-	return node.GetData()
+// GetNodeChildren gets all children of a node
+func (dataTree *DataTree) GetNodeChildren(path string) (map[string]bool, error) {
+	parentNode, ok := dataTree.NodeMap[path]
+	if !ok {
+		return nil, errors.New("node does not exist")
+	}
+
+	return parentNode.GetChildren(), nil
 }
+
+// GetNode gets the node
+func (dataTree *DataTree) GetNode(path string) (*Znode, error) {
+	node, ok := dataTree.NodeMap[path]
+	if !ok {
+		return nil, errors.New("node does not exist")
+	}
+
+	return node, nil
+}
+
+// GetData gets all data of a node
+func (dataTree *DataTree) GetData(path string) ([]byte, error) {
+	node := dataTree.NodeMap[path]
+	return node.GetData(), nil
+}
+
+// AddWatcher adds watcher based on event type to a node
+func (dataTree *DataTree) AddWatchToNode(path string, watch *Watch) (string, error) {
+	nodeAddWatch, ok := dataTree.NodeMap[path]
+	if !ok {
+		return path, errors.New("node does not exist")
+	}
+
+	nodeAddWatch.AddWatch(watch)
+	return "ok", nil
+}
+
+func (dataTree *DataTree) CheckWatchTrigger(event *Event) {
+	// based on the path of the event, the client, check the parent, check what kind of event it is - like create or delete etc
+	// remove the watch
+	lastSlashIndex := strings.LastIndex(event.Path, "/")
+	parentName := getParentName(event.Path, lastSlashIndex)
+	nodeName := event.Path[lastSlashIndex:]
+	fmt.Printf("Checking triggers with parentName:%s, nodeName:%s for zxid:%d\n", parentName, nodeName, event.Zxid)
+
+	parentNode, _ := dataTree.GetNode(parentName)
+	node, _ := dataTree.GetNode(event.Path)
+
+	// Function to remove triggered watches
+	removeTriggeredWatches := func(watches []*Watch, watchType WatchType) []*Watch {
+		var remainingWatches []*Watch
+		for _, watch := range watches {
+			if watch.Type == watchType {
+				fmt.Printf("Triggered: %s\n", watch.PrintWatch())
+			} else {
+				remainingWatches = append(remainingWatches, watch)
+			}
+		}
+		return remainingWatches
+	}
+
+	switch event.Type {
+	case Create:
+		// Check for current node
+		node.SetWatches(removeTriggeredWatches(node.GetWatches(), Exists))
+		// Check for parent node
+		parentNode.SetWatches(removeTriggeredWatches(parentNode.GetWatches(), GetChildren))
+
+		// for _, watch := range node.GetWatches() {
+		// 	if watch.Type == Exists {
+		// 		fmt.Printf("Triggered: %s\n", watch.PrintWatch())
+		// 	}
+		// }
+		// for _, watch := range parentNode.GetWatches() {
+		// 	if watch.Type == GetChildren {
+		// 		fmt.Printf("Triggered: %s\n", watch.PrintWatch())
+		// 	}
+		// }
+	case Delete:
+		// Check for current node
+		node.SetWatches(removeTriggeredWatches(node.GetWatches(), Exists))
+		node.SetWatches(removeTriggeredWatches(node.GetWatches(), GetData))
+		// Check for parent node
+		parentNode.SetWatches(removeTriggeredWatches(parentNode.GetWatches(), GetChildren))
+
+		// for _, watch := range node.GetWatches() {
+		// 	if watch.Type == Exists || watch.Type == GetData {
+		// 		fmt.Printf("Triggered: %s\n", watch.PrintWatch())
+		// 	}
+		// }
+		// for _, watch := range parentNode.GetWatches() {
+		// 	if watch.Type == GetChildren {
+		// 		fmt.Printf("Triggered: %s\n", watch.PrintWatch())
+		// 	}
+		// }
+	case Change:
+		// Check for current node
+		node.SetWatches(removeTriggeredWatches(node.GetWatches(), Exists))
+		node.SetWatches(removeTriggeredWatches(node.GetWatches(), GetData))
+		// for _, watch := range node.GetWatches() {
+		// 	if watch.Type == Exists || watch.Type == GetData {
+		// 		fmt.Printf("Triggered: %s\n", watch.PrintWatch())
+		// 	}
+		// }
+	case Child:
+		parentNode.SetWatches(removeTriggeredWatches(parentNode.GetWatches(), GetChildren))
+		// for _, watch := range parentNode.GetWatches() {
+		// 	if watch.Type == GetChildren {
+		// 		fmt.Printf("Triggered: %s\n", watch.PrintWatch())
+		// 	}
+		// }
+	}
+	fmt.Println("Done checking watches")
+}
+
+// .
+// .
+// .
+// .
+// .
+// .
+// Utility
 
 // Helper function to extract the parent name from a path.
 func getParentName(path string, lastSlashIndex int) string {

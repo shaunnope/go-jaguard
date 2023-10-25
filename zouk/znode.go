@@ -1,5 +1,10 @@
 package zouk
 
+import (
+	"errors"
+	"fmt"
+)
+
 type Stat struct {
 	Czxid          int64 // created zxid
 	Mzxid          int64 // last modified zxid
@@ -20,20 +25,21 @@ type Znode struct {
 	parent      string
 	data        []byte
 	eph         bool
-	id          int64
+	id          string
 	sequenceNum int64
+	watches     []*Watch
 }
 
-func NewNode(stat Stat, parent string, data []byte, isEphemeral bool, id int64, isSequence bool) Znode {
+func NewNode(stat Stat, parent string, data []byte, isEphemeral bool, id string, isSequence bool) Znode {
 	node := Znode{
-		stat:     stat,
-		children: map[string]bool{},
-		parent:   parent,
-		data:     data,
-		eph:      isEphemeral,
-		//TODO: What is Id for and how is the id of a znode determined
+		stat:        stat,
+		children:    map[string]bool{},
+		parent:      parent,
+		data:        data,
+		eph:         isEphemeral,
 		id:          id,
 		sequenceNum: 0,
+		watches:     []*Watch{},
 	}
 	return node
 }
@@ -95,7 +101,7 @@ func (znode *Znode) IsEphemeral() bool {
 }
 
 // GetID returns the ID of the Znode.
-func (znode *Znode) GetID() int64 {
+func (znode *Znode) GetID() string {
 	return znode.id
 }
 
@@ -127,4 +133,40 @@ func (znode *Znode) SetData(data []byte) []byte {
 	copy(updatedData, data)
 	znode.data = updatedData
 	return data
+}
+
+// Add Watch to the Znode + check if watch already exists
+func (znode *Znode) AddWatch(watch *Watch) (string, error) {
+	for _, clientWatch := range znode.watches {
+		if clientWatch.ClientId == watch.ClientId && clientWatch.Type == watch.Type {
+			return "", errors.New("watch already exists")
+		}
+	}
+	znode.watches = append(znode.watches, watch)
+	return "ok", nil
+}
+
+func (znode *Znode) GetWatches() []*Watch {
+	return znode.watches
+}
+
+func (znode *Znode) SetWatches(watches []*Watch) {
+	znode.watches = watches
+}
+
+// PrintZnode returns a string with information about a Znode, including statistics and watches.
+func (znode *Znode) PrintZnode() string {
+	znodeInfo := "	Znode Information:\n"
+	znodeInfo += fmt.Sprintf("		Path: %s \n", znode.id)
+	znodeInfo += fmt.Sprintf("		Statistics: %+v \n", znode.stat)
+	znodeInfo += fmt.Sprintf("		Data: %s \n", string(znode.data))
+	znodeInfo += fmt.Sprintf("		Ephemeral: %v \n", znode.eph)
+	znodeInfo += fmt.Sprintf("		Sequence Number: %d\n", znode.sequenceNum)
+
+	// watchInfo := "Watches:\n"
+	// for _, watch := range znode.watches {
+	// 	watchInfo += fmt.Sprintf("- %s\n", watch.PrintWatch())
+	// }
+	// return znodeInfo + watchInfo
+	return znodeInfo
 }
