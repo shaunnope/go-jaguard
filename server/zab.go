@@ -18,6 +18,8 @@ func (s *Server) InformLeader(ctx context.Context, in *pb.FollowerInfo) (*pb.Pin
 	log.Printf("%d received follower info from %d", s.Id, in.Id)
 
 	// update leader table
+	s.Leader.Lock()
+	defer s.Leader.Unlock()
 	s.Leader.FollowerEpochs[int(in.Id)] = int(in.LastZxid.Epoch)
 
 	if len(s.Leader.FollowerEpochs) > len(config.Servers)/2 {
@@ -31,14 +33,14 @@ func (s *Server) ProposeEpoch(ctx context.Context, in *pb.NewEpoch) (*pb.AckEpoc
 	if s.GetState() != FOLLOWING {
 		panic(fmt.Sprintf("%d is not follower", s.Id))
 	}
-	log.Printf("%d received new epoch from %d", s.Id, in.Epoch)
 
 	if int(in.Epoch) > s.AcceptedEpoch {
+		log.Printf("%d accepted new epoch: %d", s.Id, in.Epoch)
 		s.AcceptedEpoch = int(in.Epoch)
 		res := &pb.AckEpoch{}
 		return res, nil
 	}
-
+	log.Printf("%d rejected new epoch: %d", s.Id, in.Epoch)
 	defer s.FastElection(*maxTimeout)
 
 	// goto phase 2
@@ -52,12 +54,13 @@ func (s *Server) Discovery() {
 
 	switch s.State {
 	case FOLLOWING:
-		ctx, cancel := s.EstablishConnection(s.Vote.Id, *maxTimeout)
-		defer cancel()
 		msg := &pb.FollowerInfo{Id: int64(s.Id), LastZxid: &pb.Zxid{Epoch: int64(s.AcceptedEpoch), Counter: -1}}
-		_, err := (*s.Connections[s.Vote.Id]).InformLeader(ctx, msg)
+		_, err := SendGrpc[*pb.FollowerInfo, *pb.Ping](pb.NodeClient.InformLeader, s, s.Vote.Id, msg, *maxTimeout)
+
 		if err != nil {
-			log.Printf("%d error sending follower info to %d: %v", s.Id, idx, err)
+			log.Printf("%d error sending follower info to %d: %v", s.Id, s.Vote.Id, err)
+		} else {
+			log.Printf("%d sent follower info to %d", s.Id, s.Vote.Id)
 		}
 
 	case LEADING:
@@ -68,6 +71,8 @@ func (s *Server) Discovery() {
 				maxEpoch = epoch
 			}
 		}
+		log.Printf("%d max epoch %d", s.Id, maxEpoch)
+
 		mostRecent := &pb.AckEpoch{CurrentEpoch: -1, History: nil, LastZxid: &pb.Zxid{Epoch: -1, Counter: -1}}
 		for idx := range s.Leader.FollowerEpochs {
 			ctx, cancel := s.EstablishConnection(idx, *maxTimeout)
@@ -81,7 +86,8 @@ func (s *Server) Discovery() {
 			if r == nil {
 				return
 			}
-			if r.CurrentEpoch > mostRecent.CurrentEpoch || (r.CurrentEpoch == mostRecent.CurrentEpoch && !(r.LastZxid.Extract().LessThan(mostRecent.LastZxid.Extract()))) {
+			if r.CurrentEpoch > mostRecent.CurrentEpoch {
+				// if r.CurrentEpoch > mostRecent.CurrentEpoch || (r.CurrentEpoch == mostRecent.CurrentEpoch && !(r.LastZxid.Extract().LessThan(mostRecent.LastZxid.Extract()))) {
 				mostRecent = r
 			}
 		}

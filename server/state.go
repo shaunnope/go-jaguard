@@ -20,6 +20,7 @@ const (
 )
 
 type ZabLeader struct {
+	mu.Mutex
 	FollowerEpochs map[int]int
 	HasQuorum      chan bool
 }
@@ -39,6 +40,8 @@ type StateVector struct {
 	AcceptedEpoch int // last NewEpoch
 	CurrentEpoch  int // last NewLeader
 
+	Stop chan bool
+
 	Leader ZabLeader
 
 	// TODO: save data tree to disk
@@ -50,8 +53,9 @@ func newStateVector(idx int) StateVector {
 		Id:          idx,
 		Queue:       make(chan VoteMsg, maxElectionNotifQueueSize),
 		Connections: make(map[int]*pb.NodeClient),
-		Leader:      ZabLeader{FollowerEpochs: make(map[int]int)},
+		Leader:      ZabLeader{FollowerEpochs: make(map[int]int), HasQuorum: make(chan bool)},
 		Data:        pb.NewDataTree(),
+		Stop:        make(chan bool),
 	}
 }
 

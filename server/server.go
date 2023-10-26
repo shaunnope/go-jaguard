@@ -47,12 +47,15 @@ type Server struct {
 }
 
 func (s *Server) SendPing(ctx context.Context, in *pb.Ping) (*pb.Ping, error) {
-	log.Printf("PING %d > %d", in.Data, s.Id)
+	log.Printf("PING %d -> %d", in.Data, s.Id)
 	return &pb.Ping{Data: int64(s.Id)}, nil
 }
 
 // Establish connection to another server
 func (s *Server) EstablishConnection(to int, timeout int) (context.Context, context.CancelFunc) {
+	if to == s.Id {
+		return nil, nil
+	}
 	if _, ok := s.Connections[to]; !ok {
 		addr := fmt.Sprintf("%s:%d", config.Servers[to].Host, config.Servers[to].Port)
 		conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -74,8 +77,16 @@ func (s *Server) Serve(grpc_s *grpc.Server) {
 	// vote := s.FastElection(*maxTimeout)
 	// log.Printf("%d results: %v", s.Id, vote)
 
-	s.BasicPing()
+	s.Setup()
+	go s.Heartbeat()
 
+	// s.Discovery()
+	// log.Printf("%d finished discovery", s.Id)
+
+	// var input string
+	// fmt.Scanln(&input)
+
+	<-s.Stop
 	grpc_s.GracefulStop()
 }
 

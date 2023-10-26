@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -9,7 +10,15 @@ import (
 )
 
 func (s *Server) Heartbeat() {
+
+	// trigger shutdown
+	defer func() {
+		s.Stop <- true
+	}()
+
 	for {
+		// TODO: consider if concurrent state reads are safe
+		// i.e. not possible for 2 servers to be leading at any point in time
 		state := s.GetState()
 		switch state {
 		case LEADING:
@@ -20,11 +29,9 @@ func (s *Server) Heartbeat() {
 				if idx == s.Id {
 					continue
 				}
+
 				go func(i int) {
-					ctx, cancel := s.EstablishConnection(i, *maxTimeout)
-					defer cancel()
-					msg := &pb.Ping{Data: int64(s.Id)}
-					_, err := (*s.Connections[i]).SendPing(ctx, msg)
+					_, err := SendGrpc[*pb.Ping, *pb.Ping](pb.NodeClient.SendPing, s, i, &pb.Ping{Data: int64(s.Id)}, *maxTimeout)
 					if err != nil {
 						failed[i] = true
 					}
@@ -44,16 +51,14 @@ func (s *Server) Heartbeat() {
 
 		case FOLLOWING:
 			// Simulate failure
-			// fail := rand.Intn(100) < 10
-			// if fail {
-			// 	log.Printf("%d failed", s.Id)
-			// 	return
-			// }
+			fail := rand.Intn(100) < 10
+			if fail {
+				log.Printf("%d failed", s.Id)
+				return
+			}
 
-			ctx, cancel := s.EstablishConnection(s.Vote.Id, *maxTimeout)
-			defer cancel()
-			msg := &pb.Ping{Data: int64(s.Id)}
-			_, err := (*s.Connections[s.Vote.Id]).SendPing(ctx, msg)
+			// Send heartbeat to leader
+			_, err := SendGrpc[*pb.Ping, *pb.Ping](pb.NodeClient.SendPing, s, s.Vote.Id, &pb.Ping{Data: int64(s.Id)}, *maxTimeout)
 			if err != nil {
 				// s.SetState(ELECTION)
 				log.Printf("%d lost leader", s.Id)

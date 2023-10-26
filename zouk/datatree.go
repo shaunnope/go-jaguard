@@ -162,7 +162,7 @@ func (dataTree *DataTree) AddWatchToNode(path string, watch *Watch) (string, err
 func (dataTree *DataTree) CheckWatchTrigger(event *Event) {
 	// based on the path of the event, the client, check the parent, check what kind of event it is - like create or delete etc
 	// remove the watch
-	lastSlashIndex := strings.LastIndex(event.Path, "/")
+	lastSlashIndex := strings.LastIndex(event.Path, PATH_SEP)
 	parentName := getParentName(event.Path, lastSlashIndex)
 	nodeName := event.Path[lastSlashIndex:]
 	fmt.Printf("Checking triggers with parentName:%s, nodeName:%s for zxid:%d\n", parentName, nodeName, event.Zxid)

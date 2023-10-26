@@ -6,7 +6,7 @@ type ZxidFragment struct {
 }
 
 func (z *Zxid) Extract() ZxidFragment {
-	return ZxidFragment{int(z.Epoch), int(z.Counter)}
+	return ZxidFragment{Epoch: int(z.Epoch), Counter: int(z.Counter)}
 }
 
 func (z ZxidFragment) LessThan(other ZxidFragment) bool {
