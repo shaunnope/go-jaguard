@@ -2,12 +2,9 @@ package main
 
 import (
 	"context"
-	"encoding/json"
-	"flag"
 	"fmt"
 	"log"
 	"net"
-	"os"
 	"time"
 
 	pb "github.com/shaunnope/go-jaguard/zouk"
@@ -15,39 +12,13 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-var (
-	// flags
-	configPath = flag.String("config", "config.json", "path to config file")
-	config     Config
-
-	idx = flag.Int("idx", 0, "server index")
-
-	maxTimeout = flag.Int("maxTimeout", 1000, "max timeout for election")
-
-	// port = flag.Int("port", 50051, "server port")
-	// leader = flag.Bool("isLeader", false, "server is leader")
-	// head = new(pb.Znode)
-	// other_servers = []string{"localhost:50052", "localhost:50053", "localhost:50054"}
-)
-
-func parseConfig(path string) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		log.Fatalf("failed to read config file: %v", err)
-	}
-
-	if err := json.Unmarshal(data, &config); err != nil {
-		log.Fatalf("failed to parse config file: %v", err)
-	}
-}
-
 type Server struct {
 	pb.UnimplementedNodeServer
 	StateVector
 }
 
 func (s *Server) SendPing(ctx context.Context, in *pb.Ping) (*pb.Ping, error) {
-	log.Printf("PING %d -> %d", in.Data, s.Id)
+	// log.Printf("PING %d -> %d", in.Data, s.Id)
 	return &pb.Ping{Data: int64(s.Id)}, nil
 }
 
@@ -80,7 +51,7 @@ func (s *Server) Serve(grpc_s *grpc.Server) {
 	s.Setup()
 	go s.Heartbeat()
 
-	// s.Discovery()
+	s.Discovery()
 	// log.Printf("%d finished discovery", s.Id)
 
 	// var input string
@@ -112,16 +83,4 @@ func Run(idx int) {
 	if err := grpc_s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
 	}
-}
-
-func main() {
-	flag.Parse()
-	parseConfig(*configPath)
-	// Run(*idx)
-	for idx := range config.Servers {
-		go Run(idx)
-	}
-
-	var input string
-	fmt.Scanln(&input)
 }
