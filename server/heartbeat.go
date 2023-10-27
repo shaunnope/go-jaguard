@@ -2,7 +2,6 @@ package main
 
 import (
 	"log"
-	"math/rand"
 	"sync"
 	"time"
 
@@ -12,15 +11,14 @@ import (
 func (s *Server) Heartbeat() {
 
 	// trigger shutdown
-	defer func() {
-		s.Stop <- true
-	}()
+	// defer func() {
+	// 	s.Stop <- true
+	// }()
 
 	for {
 		// TODO: consider if concurrent state reads are safe
 		// i.e. not possible for 2 servers to be leading at any point in time
-		state := s.GetState()
-		switch state {
+		switch s.State {
 		case LEADING:
 			failed := make(map[int]bool)
 			wg := sync.WaitGroup{}
@@ -41,31 +39,29 @@ func (s *Server) Heartbeat() {
 			// check for failed nodes
 			wg.Wait()
 			if len(failed) > len(config.Servers)/2 {
-				// s.SetState(ELECTION)
 				log.Printf("%d lost quorum", s.Id)
-				// s.FastElection(1000)
+				s.FastElection(*maxTimeout)
 				return
-			} else {
-				log.Printf("%d has quorum", s.Id)
+				// } else {
+				// 	log.Printf("%d has quorum", s.Id)
 			}
 
 		case FOLLOWING:
 			// Simulate failure
-			fail := rand.Intn(100) < 10
-			if fail {
-				log.Printf("%d failed", s.Id)
-				return
-			}
+			// fail := rand.Intn(100) < 10
+			// if fail {
+			// 	log.Printf("%d failed", s.Id)
+			// 	return
+			// }
 
 			// Send heartbeat to leader
 			_, err := SendGrpc[*pb.Ping, *pb.Ping](pb.NodeClient.SendPing, s, s.Vote.Id, &pb.Ping{Data: int64(s.Id)}, *maxTimeout)
 			if err != nil {
-				// s.SetState(ELECTION)
 				log.Printf("%d lost leader", s.Id)
-				// s.FastElection(1000)
+				s.FastElection(*maxTimeout)
 				return
-			} else {
-				log.Printf("%d has leader", s.Id)
+				// } else {
+				// 	log.Printf("%d has leader", s.Id)
 			}
 
 		}

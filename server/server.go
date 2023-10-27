@@ -17,6 +17,11 @@ type Server struct {
 	StateVector
 }
 
+func NewNode(idx int) *Server {
+	s := &Server{StateVector: newStateVector(idx)}
+	return s
+}
+
 func (s *Server) SendPing(ctx context.Context, in *pb.Ping) (*pb.Ping, error) {
 	// log.Printf("PING %d -> %d", in.Data, s.Id)
 	return &pb.Ping{Data: int64(s.Id)}, nil
@@ -45,13 +50,12 @@ func (s *Server) EstablishConnection(to int, timeout int) (context.Context, cont
 // Use reference to grpc server to stop it
 func (s *Server) Serve(grpc_s *grpc.Server) {
 	time.Sleep(200 * time.Millisecond)
-	// vote := s.FastElection(*maxTimeout)
-	// log.Printf("%d results: %v", s.Id, vote)
+	vote := s.FastElection(*maxTimeout)
 
-	s.Setup()
+	s.Setup(vote)
 	go s.Heartbeat()
 
-	s.Discovery()
+	// s.Discovery()
 	// log.Printf("%d finished discovery", s.Id)
 
 	// var input string
@@ -61,11 +65,6 @@ func (s *Server) Serve(grpc_s *grpc.Server) {
 	grpc_s.GracefulStop()
 }
 
-func newNode(idx int) *Server {
-	s := &Server{StateVector: newStateVector(idx)}
-	return s
-}
-
 func Run(idx int) {
 	addr := config.Servers[idx]
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", addr.Port))
@@ -73,7 +72,7 @@ func Run(idx int) {
 		log.Fatalf("failed to listen: %v", err)
 	}
 	grpc_s := grpc.NewServer()
-	node := newNode(idx)
+	node := NewNode(idx)
 	pb.RegisterNodeServer(grpc_s, node)
 	log.Printf("server %d listening at %v", idx, lis.Addr())
 

@@ -24,6 +24,9 @@ func SendGrpc[T pb.Message, R pb.Message](
 		conn := s.Connections[to]
 		defer cancel()
 		r, err = F(*conn, ctx, msg)
+		if err == nil {
+			break
+		}
 	}
 	if err != nil {
 		msg.Error(s.Id, to, err)

@@ -34,6 +34,9 @@ func (s *Server) Create(ctx context.Context, in *pb.CreateRequest) (*pb.CreateRe
 					}
 				}(idx)
 			}
+			// missing above: send zxid
+			// check quorum
+			// commit locally
 
 		} else {
 			// forward to leader

@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"log"
 	"math"
 	"time"
 
@@ -49,12 +48,6 @@ func (s *Server) ElectNotify(from int) *pb.ElectResponse {
 	if s.Id == from {
 		return nil
 	}
-	// establish connection
-	ctx, cancel := s.EstablishConnection(from, *maxTimeout)
-
-	// send vote notif
-	// TODO: adjust timeout value
-	defer cancel()
 	msg := &pb.ElectNotification{
 		Id:    int64(s.Id),
 		State: int64(s.State),
@@ -64,11 +57,13 @@ func (s *Server) ElectNotify(from int) *pb.ElectResponse {
 		},
 		Round: int64(s.Round),
 	}
-	r, err := (*s.Connections[from]).Elect(ctx, msg)
-	if err != nil {
-		log.Printf("%d error sending vote notif to %d: %v", s.Id, from, err)
-		// return nil, err
-	}
+
+	// send vote notification
+	// TODO: adjust timeout value
+	r, _ := SendGrpc[*pb.ElectNotification, *pb.ElectResponse](pb.NodeClient.Elect, s, from, msg, *maxTimeout)
+	// if err != nil {
+	// return nil, err
+	// }
 
 	return r
 }
@@ -88,7 +83,7 @@ func (s *Server) Elect(ctx context.Context, in *pb.ElectNotification) (*pb.Elect
 
 	reply := false
 
-	if s.GetState() == ELECTION {
+	if s.State == ELECTION {
 		s.Queue <- in
 
 		reply = (msgState == ELECTION && int(in.Round) < s.Round)
@@ -98,6 +93,7 @@ func (s *Server) Elect(ctx context.Context, in *pb.ElectNotification) (*pb.Elect
 	}
 
 	if reply {
+		// log.Printf("%d sending vote response to %d", s.Id, from)
 		s.ElectNotify(from)
 	}
 
@@ -125,8 +121,15 @@ func (s *Server) FastElection(t0 int) Vote {
 	for s.State == ELECTION {
 		var n VoteMsg
 		select {
+		case <-time.After(time.Duration(timeout) * time.Millisecond):
+			// timeout
+			s.ElectBroadcast()
+			timeout = int(math.Max(float64(2*timeout), maxElectionTimeout))
+
 		case n = <-s.Queue:
 			nVote := n.Vote.Data()
+
+			// log.Printf("%d (%d) received %d (%d): %v", s.Id, s.Round, n.Id, n.Round, nVote)
 
 			if State(n.State) == ELECTION {
 				if int(n.Round) > s.Round {
@@ -147,10 +150,11 @@ func (s *Server) FastElection(t0 int) Vote {
 				}
 
 				receivedVotes.Put(int(n.Id), nVote, int(n.Round))
-				if len(receivedVotes) == len(config.Servers) {
+				if len(receivedVotes) == len(config.Servers)-1 {
 					s.DeduceLeader(s.Vote.Id)
 					return s.Vote
 				} else if receivedVotes.HasQuorum(s.Vote) && len(s.Queue) > 0 {
+					// FIXME: queue should be processed until empty
 					time.Sleep(time.Duration(t0) * time.Millisecond)
 					if len(s.Queue) == 0 {
 						s.DeduceLeader(s.Vote.Id)
@@ -192,11 +196,6 @@ func (s *Server) FastElection(t0 int) Vote {
 					}
 				}
 			}
-
-		case <-time.After(time.Duration(timeout) * time.Millisecond):
-			// timeout
-			s.ElectBroadcast()
-			timeout = int(math.Max(float64(2*timeout), maxElectionTimeout))
 		}
 	}
 

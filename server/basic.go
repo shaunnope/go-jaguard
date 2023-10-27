@@ -2,19 +2,20 @@ package main
 
 import (
 	"log"
+
+	pb "github.com/shaunnope/go-jaguard/zouk"
 )
 
 // Manual setup of server states
-func (s *Server) Setup() {
+func (s *Server) Setup(vote pb.VoteFragment) {
 	s.Lock()
 	defer s.Unlock()
-	if s.Id == len(config.Servers)-1 {
+	s.Vote = vote
+	if s.Id == vote.Id {
 		s.State = LEADING
-		s.Vote = Vote{Id: s.Id}
 		log.Printf("server %d is leader", s.Id)
 	} else {
 		s.State = FOLLOWING
-		s.Vote = Vote{Id: len(config.Servers) - 1}
 		log.Printf("server %d is following %v", s.Id, s.Vote)
 	}
 
