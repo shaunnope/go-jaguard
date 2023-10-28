@@ -1,6 +1,12 @@
 syntax = "proto3";
 option go_package = "github.com/shaunnope/go-jaguard/zouk";
 
+enum OperationType {
+    READ = 0;
+    WRITE = 1;
+    DELETE = 2;
+}
+
 message Zxid {
     int64 epoch = 1;
     int64 counter = 2;
@@ -11,7 +17,7 @@ message Transaction {
     string path = 2;
     bytes data = 3;
     string flags = 4;
-    int64 type = 5;
+    OperationType type = 5;
 }
 
 message Ping {
@@ -66,7 +72,34 @@ message AckEpoch {
     Zxid lastZxid = 3;
 }
 
+message NewLeader {
+    int64 epoch = 1;
+    repeated Transaction history = 2;
+    Zxid lastZxid = 3;
+}
+
+message AckLeader {
+    int64 epoch = 1;
+}
+
 // end zab
+
+// read/write
+
+message ZabRequest {
+    Transaction transaction = 1;
+    RequestType requestType = 2;
+}
+
+message ZabAck {
+    ZabRequest request = 1;
+}
+
+message ReadResponse {
+    bytes data = 1;
+    string flags = 2;
+    Zxid zxid = 3;
+}
 
 
 message CreateRequest {
@@ -100,6 +133,9 @@ service Node {
 
     rpc InformLeader (FollowerInfo) returns (Ping);
     rpc ProposeEpoch (NewEpoch) returns (AckEpoch);
+    rpc ProposeLeader (NewLeader) returns (AckLeader);
+
+    rpc SendZabRequest (ZabRequest) returns (ZabAck);
     
     rpc Create(CreateRequest) returns (CreateResponse);
 }

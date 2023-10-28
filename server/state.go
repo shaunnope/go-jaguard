@@ -22,8 +22,19 @@ const (
 type ZabLeader struct {
 	mu.Mutex
 	FollowerEpochs map[int]int
-	HasQuorum      chan bool
+	QuorumReady    chan bool
+	HasQuorum      bool
 }
+
+func (l *ZabLeader) Reset() {
+	l.Lock()
+	defer l.Unlock()
+	l.FollowerEpochs = make(map[int]int)
+	l.QuorumReady = make(chan bool)
+	l.HasQuorum = false
+}
+
+type Transactions = pb.TransactionFragments
 
 type StateVector struct {
 	mu.Mutex
@@ -36,10 +47,11 @@ type StateVector struct {
 
 	Connections map[int]*pb.NodeClient
 
-	History       []Transaction
+	History       Transactions
 	AcceptedEpoch int // last NewEpoch
 	CurrentEpoch  int // last NewLeader
 
+	// channel to stop server
 	Stop chan bool
 
 	Leader ZabLeader
@@ -48,12 +60,12 @@ type StateVector struct {
 	Data *pb.DataTree
 }
 
-func newStateVector(idx int) StateVector {
+func NewStateVector(idx int) StateVector {
 	return StateVector{
 		Id:          idx,
 		Queue:       make(chan VoteMsg, maxElectionNotifQueueSize),
 		Connections: make(map[int]*pb.NodeClient),
-		Leader:      ZabLeader{FollowerEpochs: make(map[int]int), HasQuorum: make(chan bool)},
+		Leader:      ZabLeader{FollowerEpochs: make(map[int]int), QuorumReady: make(chan bool)},
 		Data:        pb.NewDataTree(),
 		Stop:        make(chan bool),
 	}

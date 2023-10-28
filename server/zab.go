@@ -5,11 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"sync"
 
 	pb "github.com/shaunnope/go-jaguard/zouk"
 )
 
-type Transaction = pb.TransactionFragment
+// grpc calls
 
 func (s *Server) InformLeader(ctx context.Context, in *pb.FollowerInfo) (*pb.Ping, error) {
 	if s.State != LEADING {
@@ -17,20 +18,45 @@ func (s *Server) InformLeader(ctx context.Context, in *pb.FollowerInfo) (*pb.Pin
 	}
 	log.Printf("%d received follower info from %d", s.Id, in.Id)
 
-	// update leader table
-	s.Leader.Lock()
-	defer s.Leader.Unlock()
-	s.Leader.FollowerEpochs[int(in.Id)] = int(in.LastZxid.Epoch)
+	if !s.Leader.HasQuorum {
+		s.Leader.Lock()
+		defer s.Leader.Unlock()
+		// update leader table
+		s.Leader.FollowerEpochs[int(in.Id)] = int(in.LastZxid.Epoch)
 
-	if len(s.Leader.FollowerEpochs) > len(config.Servers)/2 {
-		s.Leader.HasQuorum <- true
+		if len(s.Leader.FollowerEpochs) > len(config.Servers)/2 {
+			s.Leader.HasQuorum = true
+			s.Leader.QuorumReady <- true
+		}
+
+	} else {
+		// TODO: send NEWEPOCH and NEWLEADER to new follower
+		_, err := SendGrpc[*pb.NewEpoch, *pb.AckEpoch](pb.NodeClient.ProposeEpoch, s, int(in.Id), &pb.NewEpoch{Epoch: int64(s.CurrentEpoch)}, *maxTimeout)
+		if err != nil {
+			log.Printf("%d error sending new epoch to %d: %v", s.Id, in.Id, err)
+		}
+		msg := &pb.NewLeader{Epoch: int64(s.CurrentEpoch), History: s.History.Raw()}
+		r, err := SendGrpc[*pb.NewLeader, *pb.AckLeader](
+			pb.NodeClient.ProposeLeader,
+			s, int(in.Id), msg,
+			*maxTimeout)
+		if err != nil {
+			log.Printf("%d error sending new leader to %d: %v", s.Id, in.Id, err)
+		}
+
+		// send COMMIT to new follower
+		s.Leader.Lock()
+		defer s.Leader.Unlock()
+		// update leader table
+		s.Leader.FollowerEpochs[int(in.Id)] = int(r.Epoch)
+
 	}
 
 	return &pb.Ping{Data: int64(s.CurrentEpoch)}, nil
 }
 
 func (s *Server) ProposeEpoch(ctx context.Context, in *pb.NewEpoch) (*pb.AckEpoch, error) {
-	if s.GetState() != FOLLOWING {
+	if s.State != FOLLOWING {
 		panic(fmt.Sprintf("%d is not follower", s.Id))
 	}
 
@@ -41,14 +67,149 @@ func (s *Server) ProposeEpoch(ctx context.Context, in *pb.NewEpoch) (*pb.AckEpoc
 		return res, nil
 	}
 	log.Printf("%d rejected new epoch: %d", s.Id, in.Epoch)
-	defer s.FastElection(*maxTimeout)
+
+	if int(in.Epoch) < s.AcceptedEpoch {
+		go func() {
+			// FIXME: issue - Election requires lock, but is held by Discovery
+			// vote := s.FastElection(*maxTimeout)
+
+		}()
+	}
 
 	// goto phase 2
+	defer s.ZabSync()
 
 	return nil, errors.New("epoch not accepted")
 }
 
+// FIXME: incomplete
+func (s *Server) ProposeLeader(ctx context.Context, in *pb.NewLeader) (*pb.AckLeader, error) {
+	if s.State != FOLLOWING {
+		panic(fmt.Sprintf("%d is not follower", s.Id))
+	}
+
+	if s.AcceptedEpoch == int(in.Epoch) {
+		//atomically
+		s.CurrentEpoch = int(in.Epoch)
+		transactions := pb.Transactions(in.History).ExtractAll()
+		s.History = append(s.History, transactions...)
+	}
+
+	if int(in.Epoch) > s.AcceptedEpoch {
+		log.Printf("%d accepted new leader: %d", s.Id, in.Epoch)
+		s.AcceptedEpoch = int(in.Epoch)
+		res := &pb.AckLeader{}
+		return res, nil
+	}
+	log.Printf("%d rejected new leader: %d", s.Id, in.Epoch)
+
+	if int(in.Epoch) < s.AcceptedEpoch {
+		go func() {
+		}()
+	}
+
+	// goto phase 2
+	defer s.ZabSync()
+
+	return nil, errors.New("leader not accepted")
+}
+
+func (s *Server) SendZabRequest(ctx context.Context, in *pb.ZabRequest) (*pb.ZabAck, error) {
+	isLeader := s.GetState() == LEADING
+
+	// Handle incoming CreateRequest
+	switch in.RequestType {
+	case pb.RequestType_PROPOSAL:
+		if isLeader {
+			return nil, errors.New("leaders shouldnt get proposals")
+		}
+
+		if int(in.Transaction.Zxid.Epoch) == s.CurrentEpoch {
+			// accept proposal
+			s.History = append(s.History, in.Transaction.Extract())
+			// send ack to leader
+			return &pb.ZabAck{Request: in}, nil
+		}
+
+		return nil, errors.New("proposal not accepted")
+
+	case pb.RequestType_ANNOUNCEMENT:
+		if isLeader {
+			return nil, errors.New("leaders shouldnt get announcements")
+		}
+
+		// TODO: for each commit (announcement), wait until all earlier proposals are committed
+		// then, commit
+
+	case pb.RequestType_CLIENT:
+		// if leader send proposal to all followers in for loop (rpc)
+		// since its rpc, leader will monitor for responses and decide whether to commit/announce
+		// if follower forward to leader, do nothing with response (rpc)
+		if isLeader {
+			// TODO: verify version
+			// propose to all
+
+			msg := &pb.ZabRequest{
+				Transaction: in.Transaction.WithZxid(s.LastZxid.Inc()),
+				RequestType: pb.RequestType_PROPOSAL,
+			}
+
+			wg := sync.WaitGroup{}
+			wg.Add(len(s.Leader.FollowerEpochs)/2 + 1)
+
+			for idx := range s.Leader.FollowerEpochs {
+				if idx == s.Id {
+					continue
+				}
+
+				go func(i int) {
+					_, err := SendGrpc[*pb.ZabRequest, *pb.ZabAck](pb.NodeClient.SendZabRequest, s, i, msg, *maxTimeout)
+					if err == nil {
+						wg.Done()
+					}
+				}(idx)
+			}
+			// wait for quorum
+			wg.Wait()
+
+			// commit
+			s.History = append(s.History, in.Transaction.Extract())
+
+			msg.RequestType = pb.RequestType_ANNOUNCEMENT
+			for idx := range s.Leader.FollowerEpochs {
+				if idx == s.Id {
+					continue
+				}
+
+				go SendGrpc[*pb.ZabRequest, *pb.ZabAck](pb.NodeClient.SendZabRequest, s, idx, msg, *maxTimeout)
+			}
+
+		} else {
+			// todo verify version
+			// forward to leader
+			SendGrpc[*pb.ZabRequest, *pb.ZabAck](pb.NodeClient.SendZabRequest, s, s.Vote.Id, in, *maxTimeout)
+
+		}
+	}
+
+	switch in.Transaction.Type {
+	case pb.OperationType_WRITE:
+
+	case pb.OperationType_DELETE:
+	}
+
+	return nil, errors.New("zab request not accepted")
+}
+
+// end grpc calls
+
+// Phase 1 of ZAB
 func (s *Server) Discovery() {
+	// why lock here?
+	// state: read
+	// vote: read
+	// history?: write
+
 	s.Lock()
 	defer s.Unlock()
 
@@ -64,7 +225,8 @@ func (s *Server) Discovery() {
 		}
 
 	case LEADING:
-		<-s.Leader.HasQuorum
+		s.Leader.Reset()
+		<-s.Leader.QuorumReady
 		maxEpoch := -1
 		for _, epoch := range s.Leader.FollowerEpochs {
 			if epoch > maxEpoch {
@@ -75,10 +237,8 @@ func (s *Server) Discovery() {
 
 		mostRecent := &pb.AckEpoch{CurrentEpoch: -1, History: nil, LastZxid: &pb.Zxid{Epoch: -1, Counter: -1}}
 		for idx := range s.Leader.FollowerEpochs {
-			ctx, cancel := s.EstablishConnection(idx, *maxTimeout)
-			defer cancel()
 			msg := &pb.NewEpoch{Epoch: int64(maxEpoch + 1)}
-			r, err := (*s.Connections[idx]).ProposeEpoch(ctx, msg)
+			r, err := SendGrpc[*pb.NewEpoch, *pb.AckEpoch](pb.NodeClient.ProposeEpoch, s, idx, msg, *maxTimeout)
 			if err != nil {
 				log.Printf("%d error sending new epoch to %d: %v", s.Id, idx, err)
 			}
@@ -93,5 +253,53 @@ func (s *Server) Discovery() {
 		}
 		s.History = pb.Transactions(mostRecent.History).ExtractAll()
 		// goto phase 2
+		defer s.ZabSync()
+	}
+}
+
+// Phase 2 of ZAB
+func (s *Server) ZabSync() {
+	// why lock here?
+	// state: read
+	// vote: read
+	// history?: write
+
+	s.Lock()
+	defer s.Unlock()
+
+	switch s.State {
+	case FOLLOWING:
+
+	}
+}
+
+// Phase 3 utils
+
+func (s *Server) ZabCommit() {
+
+	switch s.State {
+	case FOLLOWING:
+
+	}
+}
+
+// Phase 3 of ZAB
+// the main phase for non-faulty operation
+
+func (s *Server) ZabBroadcast() {
+
+	// if leading, invoke ready (?)
+
+	// why lock here?
+	// state: read
+	// vote: read
+	// history?: write
+
+	s.Lock()
+	defer s.Unlock()
+
+	switch s.State {
+	case FOLLOWING:
+
 	}
 }

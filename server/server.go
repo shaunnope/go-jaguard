@@ -18,7 +18,7 @@ type Server struct {
 }
 
 func NewNode(idx int) *Server {
-	s := &Server{StateVector: newStateVector(idx)}
+	s := &Server{StateVector: NewStateVector(idx)}
 	return s
 }
 
@@ -54,6 +54,7 @@ func (s *Server) Serve(grpc_s *grpc.Server) {
 
 	s.Setup(vote)
 	go s.Heartbeat()
+	time.Sleep(200 * time.Millisecond)
 
 	// s.Discovery()
 	// log.Printf("%d finished discovery", s.Id)

@@ -16,6 +16,30 @@ func (m *NewEpoch) Done(from int, to int) {
 	// log.Printf("%d sent epoch to %d", from, to)
 }
 
+func (m *AckEpoch) Error(from int, to int, err error) {
+	log.Printf("%d error sending epoch ack to %d: %v", from, to, err)
+}
+
+func (m *AckEpoch) Done(from int, to int) {
+	// log.Printf("%d sent epoch ack to %d", from, to)
+}
+
+func (m *NewLeader) Error(from int, to int, err error) {
+	log.Printf("%d error sending leader to %d: %v", from, to, err)
+}
+
+func (m *NewLeader) Done(from int, to int) {
+	// log.Printf("%d sent leader to %d", from, to)
+}
+
+func (m *AckLeader) Error(from int, to int, err error) {
+	log.Printf("%d error sending leader ack to %d: %v", from, to, err)
+}
+
+func (m *AckLeader) Done(from int, to int) {
+	// log.Printf("%d sent leader ack to %d", from, to)
+}
+
 func (m *FollowerInfo) Error(from int, to int, err error) {
 	log.Printf("%d error sending follower info to %d: %v", from, to, err)
 }
@@ -46,4 +70,20 @@ func (m *ElectResponse) Error(from int, to int, err error) {
 
 func (m *ElectResponse) Done(from int, to int) {
 	// log.Printf("%d sent vote response to %d", from, to)
+}
+
+func (m *ZabRequest) Error(from int, to int, err error) {
+	log.Printf("%d error sending zab request to %d: %v", from, to, err)
+}
+
+func (m *ZabRequest) Done(from int, to int) {
+	// log.Printf("%d sent zab request to %d", from, to)
+}
+
+func (m *ZabAck) Error(from int, to int, err error) {
+	log.Printf("%d error sending zab ack to %d: %v", from, to, err)
+}
+
+func (m *ZabAck) Done(from int, to int) {
+	// log.Printf("%d sent zab ack to %d", from, to)
 }

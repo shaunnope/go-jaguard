@@ -21,6 +21,10 @@ func (z ZxidFragment) GreaterThan(other ZxidFragment) bool {
 	return z.Epoch > other.Epoch || (z.Epoch == other.Epoch && z.Counter > other.Counter)
 }
 
+func (z ZxidFragment) Inc() ZxidFragment {
+	return ZxidFragment{Epoch: z.Epoch, Counter: z.Counter + 1}
+}
+
 func (z ZxidFragment) Raw() *Zxid {
 	return &Zxid{Epoch: int64(z.Epoch), Counter: int64(z.Counter)}
 }
@@ -30,7 +34,23 @@ type TransactionFragment struct {
 	Path  string
 	Data  []byte
 	Flags string
-	Type  int
+	Type  OperationType
+}
+
+type TransactionFragments []TransactionFragment
+
+func (ts TransactionFragments) Raw() []*Transaction {
+	res := make([]*Transaction, len(ts))
+	for i, t := range ts {
+		res[i] = &Transaction{
+			Zxid:  t.Zxid.Raw(),
+			Path:  t.Path,
+			Data:  t.Data,
+			Flags: t.Flags,
+			Type:  t.Type,
+		}
+	}
+	return res
 }
 
 func (t *Transaction) Extract() TransactionFragment {
@@ -39,7 +59,17 @@ func (t *Transaction) Extract() TransactionFragment {
 		Path:  t.Path,
 		Data:  t.Data,
 		Flags: t.Flags,
-		Type:  int(t.Type),
+		Type:  t.Type,
+	}
+}
+
+func (t *Transaction) WithZxid(z ZxidFragment) *Transaction {
+	return &Transaction{
+		Zxid:  z.Raw(),
+		Path:  t.Path,
+		Data:  t.Data,
+		Flags: t.Flags,
+		Type:  t.Type,
 	}
 }
 

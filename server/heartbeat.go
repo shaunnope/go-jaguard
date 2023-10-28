@@ -19,6 +19,8 @@ func (s *Server) Heartbeat() {
 		// TODO: consider if concurrent state reads are safe
 		// i.e. not possible for 2 servers to be leading at any point in time
 		switch s.State {
+		case DOWN:
+			return
 		case LEADING:
 			failed := make(map[int]bool)
 			wg := sync.WaitGroup{}
