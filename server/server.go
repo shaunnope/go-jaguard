@@ -79,6 +79,8 @@ func Run(idx int) {
 
 	go node.Serve(grpc_s)
 
+	go Simulate(node)
+
 	// start grpc service (blocking)
 	if err := grpc_s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)

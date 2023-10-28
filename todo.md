@@ -1,5 +1,6 @@
 # TODO
-- heartbeat
+- [x] heartbeat
+- `EstablishConnection` : only create, save connection refs on init. cannot concurrently write to map
 - client session (*)
     - session id
     - heartbeat timeout for session expiry

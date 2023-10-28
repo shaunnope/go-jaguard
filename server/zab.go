@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log"
 	"sync"
 
@@ -14,7 +13,7 @@ import (
 
 func (s *Server) InformLeader(ctx context.Context, in *pb.FollowerInfo) (*pb.Ping, error) {
 	if s.State != LEADING {
-		panic(fmt.Sprintf("%d is not leader", s.Id))
+		return nil, errors.New("not leader")
 	}
 	log.Printf("%d received follower info from %d", s.Id, in.Id)
 
@@ -57,7 +56,7 @@ func (s *Server) InformLeader(ctx context.Context, in *pb.FollowerInfo) (*pb.Pin
 
 func (s *Server) ProposeEpoch(ctx context.Context, in *pb.NewEpoch) (*pb.AckEpoch, error) {
 	if s.State != FOLLOWING {
-		panic(fmt.Sprintf("%d is not follower", s.Id))
+		return nil, errors.New("not follower")
 	}
 
 	if int(in.Epoch) > s.AcceptedEpoch {
@@ -85,7 +84,7 @@ func (s *Server) ProposeEpoch(ctx context.Context, in *pb.NewEpoch) (*pb.AckEpoc
 // FIXME: incomplete
 func (s *Server) ProposeLeader(ctx context.Context, in *pb.NewLeader) (*pb.AckLeader, error) {
 	if s.State != FOLLOWING {
-		panic(fmt.Sprintf("%d is not follower", s.Id))
+		return nil, errors.New("not follower")
 	}
 
 	if s.AcceptedEpoch == int(in.Epoch) {
@@ -123,10 +122,12 @@ func (s *Server) SendZabRequest(ctx context.Context, in *pb.ZabRequest) (*pb.Zab
 		if isLeader {
 			return nil, errors.New("leaders shouldnt get proposals")
 		}
+		log.Printf("%d received proposal: %v", s.Id, in.Transaction)
 
 		if int(in.Transaction.Zxid.Epoch) == s.CurrentEpoch {
 			// accept proposal
 			s.History = append(s.History, in.Transaction.Extract())
+			s.LastZxid = in.Transaction.Extract().Zxid
 			// send ack to leader
 			return &pb.ZabAck{Request: in}, nil
 		}
@@ -146,6 +147,7 @@ func (s *Server) SendZabRequest(ctx context.Context, in *pb.ZabRequest) (*pb.Zab
 		// since its rpc, leader will monitor for responses and decide whether to commit/announce
 		// if follower forward to leader, do nothing with response (rpc)
 		if isLeader {
+			log.Printf("%d received client request: %v", s.Id, in.Transaction)
 			// TODO: verify version
 			// propose to all
 
@@ -174,6 +176,7 @@ func (s *Server) SendZabRequest(ctx context.Context, in *pb.ZabRequest) (*pb.Zab
 
 			// commit
 			s.History = append(s.History, in.Transaction.Extract())
+			s.LastZxid = msg.Transaction.Extract().Zxid
 
 			msg.RequestType = pb.RequestType_ANNOUNCEMENT
 			for idx := range s.Leader.FollowerEpochs {
@@ -185,6 +188,7 @@ func (s *Server) SendZabRequest(ctx context.Context, in *pb.ZabRequest) (*pb.Zab
 			}
 
 		} else {
+			log.Printf("%d forwarding request to %d", s.Id, s.Vote.Id)
 			// todo verify version
 			// forward to leader
 			SendGrpc[*pb.ZabRequest, *pb.ZabAck](pb.NodeClient.SendZabRequest, s, s.Vote.Id, in, *maxTimeout)
