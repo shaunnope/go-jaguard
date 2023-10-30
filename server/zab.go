@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"sync"
 
@@ -23,7 +25,14 @@ func (s *Server) InformLeader(ctx context.Context, in *pb.FollowerInfo) (*pb.Pin
 		// update leader table
 		s.Leader.FollowerEpochs[int(in.Id)] = int(in.LastZxid.Epoch)
 
+		jsonData, err := json.MarshalIndent(s.Leader.FollowerEpochs, "", "  ")
+		if err != nil {
+			log.Fatalf("JSON Marshaling failed: %s", err)
+		}
+		fmt.Println(string(jsonData))
+
 		if len(s.Leader.FollowerEpochs) > len(config.Servers)/2 {
+			fmt.Println("Quoram has been reached")
 			s.Leader.HasQuorum = true
 			s.Leader.QuorumReady <- true
 		}
@@ -139,8 +148,12 @@ func (s *Server) SendZabRequest(ctx context.Context, in *pb.ZabRequest) (*pb.Zab
 			return nil, errors.New("leaders shouldnt get announcements")
 		}
 
+		s.History = append(s.History, in.Transaction.Extract())
+		log.Printf("Follower's History: %+v", s.History)
+
 		// TODO: for each commit (announcement), wait until all earlier proposals are committed
 		// then, commit
+		return &pb.ZabAck{Request: in}, nil
 
 	case pb.RequestType_CLIENT:
 		// if leader send proposal to all followers in for loop (rpc)
@@ -156,23 +169,55 @@ func (s *Server) SendZabRequest(ctx context.Context, in *pb.ZabRequest) (*pb.Zab
 				RequestType: pb.RequestType_PROPOSAL,
 			}
 
-			wg := sync.WaitGroup{}
-			wg.Add(len(s.Leader.FollowerEpochs)/2 + 1)
+			log.Printf("server %d with zxid %v", s.Id, s.LastZxid.Inc())
 
+			jsonData, err := json.MarshalIndent(in.Transaction, "", "  ")
+			if err != nil {
+				log.Fatalf("JSON Marshaling failed: %s", err)
+			}
+
+			fmt.Println(string(jsonData))
+
+			s.Leader.FollowerEpochs = map[int]int{
+				0: 0,
+				1: 0,
+				2: 0,
+				4: 0,
+			}
+
+			wg := sync.WaitGroup{}
+			majoritySize := len(s.Leader.FollowerEpochs)/2 + 1
+			log.Printf("server %d need %v to reach majority", s.Id, majoritySize)
+			wg.Add(majoritySize)
+
+			jsonData, err = json.MarshalIndent(s.Leader.FollowerEpochs, "", "  ")
+			if err != nil {
+				log.Fatalf("JSON Marshaling failed: %s", err)
+			}
+
+			fmt.Println(string(jsonData))
+			successfulSends := 0
+
+			log.Printf("server %d prepare to send message: %v", s.Id, msg.Transaction)
 			for idx := range s.Leader.FollowerEpochs {
 				if idx == s.Id {
 					continue
 				}
-
+				log.Printf("server %d send proposal to %d with message: %v", s.Id, idx, msg.Transaction)
 				go func(i int) {
 					_, err := SendGrpc[*pb.ZabRequest, *pb.ZabAck](pb.NodeClient.SendZabRequest, s, i, msg, *maxTimeout)
 					if err == nil {
-						wg.Done()
+						successfulSends++
+						log.Printf("Server %d gotten %d acknowledgement", s.Id, successfulSends)
+						if successfulSends <= majoritySize {
+							wg.Done()
+						}
 					}
 				}(idx)
 			}
 			// wait for quorum
 			wg.Wait()
+			log.Printf("majority acknolwedge")
 
 			// commit
 			s.History = append(s.History, in.Transaction.Extract())
@@ -187,12 +232,15 @@ func (s *Server) SendZabRequest(ctx context.Context, in *pb.ZabRequest) (*pb.Zab
 				go SendGrpc[*pb.ZabRequest, *pb.ZabAck](pb.NodeClient.SendZabRequest, s, idx, msg, *maxTimeout)
 			}
 
+			log.Printf("Leader's History: %+v", s.History)
+			log.Printf("Leader's Last Zxid: %+v", s.LastZxid)
+			return &pb.ZabAck{Request: in}, nil
 		} else {
 			log.Printf("%d forwarding request to %d", s.Id, s.Vote.Id)
 			// todo verify version
 			// forward to leader
 			SendGrpc[*pb.ZabRequest, *pb.ZabAck](pb.NodeClient.SendZabRequest, s, s.Vote.Id, in, *maxTimeout)
-
+			return &pb.ZabAck{Request: in}, nil
 		}
 	}
 

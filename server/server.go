@@ -79,7 +79,10 @@ func Run(idx int) {
 
 	go node.Serve(grpc_s)
 
-	go Simulate(node)
+	if idx == 1 {
+		log.Printf("server %d received request from client", idx)
+		go Simulate(node)
+	}
 
 	// start grpc service (blocking)
 	if err := grpc_s.Serve(lis); err != nil {

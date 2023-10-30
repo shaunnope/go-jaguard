@@ -5,7 +5,6 @@ import (
 	crand "crypto/rand"
 	"fmt"
 	"log"
-	"math/rand"
 	"time"
 
 	pb "github.com/shaunnope/go-jaguard/zouk"
@@ -45,32 +44,61 @@ func Simulate(s *Server) {
 	}
 	c := pb.NewNodeClient(conn)
 
-	for {
-		if rand.Intn(100) < 10 {
-			go func() {
-				ctx, cancel := context.WithTimeout(context.Background(), time.Duration(*maxTimeout)*time.Millisecond)
-				defer cancel()
+	time.Sleep(time.Duration(5000) * time.Millisecond)
 
-				data := make([]byte, 10)
-				_, err := crand.Read(data)
-				if err != nil {
-					log.Printf("c%d error generating random data: %v", s.Id, err)
-				}
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(*maxTimeout)*time.Millisecond)
+		defer cancel()
 
-				req := &pb.ZabRequest{
-					Transaction: &pb.Transaction{
-						Path: "/foo",
-						Data: data,
-					},
-					RequestType: pb.RequestType_CLIENT,
-				}
-
-				_, err = c.SendZabRequest(ctx, req)
-				if err != nil {
-					log.Printf("c%d error sending zab request: %v", s.Id, err)
-				}
-			}()
+		data := make([]byte, 10)
+		_, err := crand.Read(data)
+		if err != nil {
+			log.Printf("c%d error generating random data: %v", s.Id, err)
 		}
-		time.Sleep(time.Duration(rand.Intn(5000)) * time.Millisecond)
-	}
+
+		req := &pb.ZabRequest{
+			Transaction: &pb.Transaction{
+				Zxid:  s.LastZxid.Inc().Raw(),
+				Path:  "/foo",
+				Data:  data,
+				Type:  1,
+				Flags: "someFlags",
+			},
+			RequestType: pb.RequestType_CLIENT,
+		}
+
+		_, err = c.SendZabRequest(ctx, req)
+		if err != nil {
+			log.Printf("%d error sending zab request: %v", s.Id, err)
+		}
+	}()
+
+	// for {
+	// 	if rand.Intn(100) < 10 {
+	// 		go func() {
+	// 			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(*maxTimeout)*time.Millisecond)
+	// 			defer cancel()
+
+	// 			data := make([]byte, 10)
+	// 			_, err := crand.Read(data)
+	// 			if err != nil {
+	// 				log.Printf("c%d error generating random data: %v", s.Id, err)
+	// 			}
+
+	// 			req := &pb.ZabRequest{
+	// 				Transaction: &pb.Transaction{
+	// 					Path: "/foo",
+	// 					Data: data,
+	// 				},
+	// 				RequestType: pb.RequestType_CLIENT,
+	// 			}
+
+	// 			_, err = c.SendZabRequest(ctx, req)
+	// 			if err != nil {
+	// 				log.Printf("%d error sending zab request: %v", s.Id, err)
+	// 			}
+	// 		}()
+	// 	}
+	// 	time.Sleep(time.Duration(rand.Intn(5000)) * time.Millisecond)
+	// }
 }
