@@ -81,7 +81,8 @@ func Run(idx int) {
 
 	if idx == 1 {
 		log.Printf("server %d received request from client", idx)
-		go Simulate(node)
+		Simulate(node)
+		// Simulate(node)
 	}
 
 	// start grpc service (blocking)

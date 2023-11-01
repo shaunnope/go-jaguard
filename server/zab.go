@@ -153,6 +153,12 @@ func (s *Server) SendZabRequest(ctx context.Context, in *pb.ZabRequest) (*pb.Zab
 
 		// TODO: for each commit (announcement), wait until all earlier proposals are committed
 		// then, commit
+
+		// @Shi Hiui: Follower commit change on local copy
+		// LEADER need to execute request
+		transaction := in.Transaction.Extract()
+		s.HandleOperation(transaction)
+
 		return &pb.ZabAck{Request: in}, nil
 
 	case pb.RequestType_CLIENT:
@@ -223,6 +229,11 @@ func (s *Server) SendZabRequest(ctx context.Context, in *pb.ZabRequest) (*pb.Zab
 			s.History = append(s.History, in.Transaction.Extract())
 			s.LastZxid = msg.Transaction.Extract().Zxid
 
+			// @Shi Hui: Leader commit change on local copy
+			// LEADER need to execute request
+			transaction := in.Transaction.Extract()
+			s.HandleOperation(transaction)
+
 			msg.RequestType = pb.RequestType_ANNOUNCEMENT
 			for idx := range s.Leader.FollowerEpochs {
 				if idx == s.Id {
@@ -251,6 +262,36 @@ func (s *Server) SendZabRequest(ctx context.Context, in *pb.ZabRequest) (*pb.Zab
 	}
 
 	return nil, errors.New("zab request not accepted")
+}
+
+func (s *Server) HandleOperation(transaction pb.TransactionFragment) {
+	//s.Unlock()
+	switch transaction.Type {
+	case pb.OperationType_WRITE:
+		//zxid := pb.ZxidFragment{int(in.Transaction.Zxid.Epoch), int(in.Transaction.Zxid.Counter)}
+		//ephemeral owner??
+		path, err := s.StateVector.Data.CreateNode(transaction.Path, transaction.Data, false, 1, transaction.Zxid, true)
+		if err != nil {
+			log.Println(err)
+		}
+		log.Printf("node created at %s", path)
+
+	// case pb.OperationType_UPDATE:
+	// 	//Check node exists? Done here or in add into setdata method?
+	// 	//zxid := pb.ZxidFragment{int(in.Transaction.Zxid.Epoch), int(in.Transaction.Zxid.Counter)}
+	// 	//Version??
+	// 	s.StateVector.Data.SetData(transaction.Path, transaction.Data, 0, transaction.Zxid)
+	// 	log.Printf("node at %s updated", transaction.Path)
+
+	case pb.OperationType_DELETE:
+		outcome, err := s.StateVector.Data.DeleteNode(transaction.Path, 0)
+		if err != nil {
+			log.Println(err)
+		}
+		log.Println(outcome)
+
+	}
+	//s.Lock()
 }
 
 // end grpc calls

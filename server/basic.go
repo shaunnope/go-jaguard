@@ -71,6 +71,22 @@ func Simulate(s *Server) {
 		if err != nil {
 			log.Printf("%d error sending zab request: %v", s.Id, err)
 		}
+
+		req = &pb.ZabRequest{
+			Transaction: &pb.Transaction{
+				Zxid:  s.LastZxid.Inc().Raw(),
+				Path:  "/boo",
+				Data:  data,
+				Type:  1,
+				Flags: "someFlags",
+			},
+			RequestType: pb.RequestType_CLIENT,
+		}
+
+		_, err = c.SendZabRequest(ctx, req)
+		if err != nil {
+			log.Printf("%d error sending zab request: %v", s.Id, err)
+		}
 	}()
 
 	// for {
