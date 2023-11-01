@@ -145,48 +145,19 @@ func (s *Server) SendZabRequest(ctx context.Context, in *pb.ZabRequest) (*pb.Zab
 		// Check that transaction is at the start of the queue
 		// FOLLOWER need to execute request
 
-		/*
-			//transactionFragment := in.Transaction.Extract()
-			//s.CommitQueue.Push(transactionFragment)
+		transaction := in.Transaction.Extract()
+		//s.CommitQueue.Push(transaction)
 
-			//s.CommitQueue.Update(transactionFragment) //???
+		//wait until transaction is at the start of the queue
+		//while transaction.Zxid != s.CommitQueue.Peek().Zxid
 
-			transaction := in.Transaction.Extract()
+		s.HandleOperation(transaction)
 
-			//wait until transaction is at the start of the queue
-
-			s.Unlock()
-			switch in.Transaction.Type {
-			case pb.OperationType_CREATE:
-				zxid := pb.ZxidFragment{int(in.Transaction.Zxid.Epoch), int(in.Transaction.Zxid.Counter)}
-				//ephemeral owner??
-				path, err := s.StateVector.Data.CreateNode(transaction.Path, transaction.Data, transaction.Flags&pb.EPHEMERAL != 0, 0, zxid, transaction.Flags&pb.SEQUENTIAL != 0)
-				if err != nil {
-					return nil, err
-				}
-				log.Printf("node created at %s", path)
-
-			case pb.OperationType_UPDATE:
-				//Check node exists? Done here or in add into setdata method?
-				zxid := pb.ZxidFragment{int(in.Transaction.Zxid.Epoch), int(in.Transaction.Zxid.Counter)}
-				//Version??
-				s.StateVector.Data.SetData(transaction.Path, transaction.Data, 0, zxid)
-				log.Printf("node at ")
-			case pb.OperationType_DELETE:
-				outcome, err := s.StateVector.Data.DeleteNode(in.Transaction.Path, 0)
-				if err != nil {
-					return nil, err
-				}
-				log.Println(outcome)
-
-			}
-			s.Lock()
-
-			//Remove transaction from CommitQueue
-			//Add transaction into History
-			s.History = append(s.History, in.Transaction.Extract())
-
-		*/
+		//Remove transaction from CommitQueue
+		//s.CommitQueue.Pop()
+		//Add transaction into History
+		s.History = append(s.History, in.Transaction.Extract())
+		s.LastZxid = transaction.Zxid
 
 	case pb.RequestType_CLIENT:
 		// if leader send proposal to all followers in for loop (rpc)
@@ -220,10 +191,6 @@ func (s *Server) SendZabRequest(ctx context.Context, in *pb.ZabRequest) (*pb.Zab
 			// wait for quorum
 			wg.Wait()
 
-			// commit
-			s.History = append(s.History, in.Transaction.Extract())
-			s.LastZxid = msg.Transaction.Extract().Zxid
-
 			msg.RequestType = pb.RequestType_ANNOUNCEMENT
 			for idx := range s.Leader.FollowerEpochs {
 				if idx == s.Id {
@@ -234,6 +201,12 @@ func (s *Server) SendZabRequest(ctx context.Context, in *pb.ZabRequest) (*pb.Zab
 			}
 
 			// LEADER need to execute request
+			transaction := in.Transaction.Extract()
+			s.HandleOperation(transaction)
+
+			// commit
+			s.History = append(s.History, in.Transaction.Extract())
+			s.LastZxid = msg.Transaction.Extract().Zxid
 
 		} else {
 			log.Printf("%d forwarding request to %d", s.Id, s.Vote.Id)
@@ -249,9 +222,34 @@ func (s *Server) SendZabRequest(ctx context.Context, in *pb.ZabRequest) (*pb.Zab
 
 // end grpc calls
 
-//func (s *Server) HandleOperation() {
+func (s *Server) HandleOperation(transaction pb.TransactionFragment) {
+	s.Unlock()
+	switch transaction.Type {
+	case pb.OperationType_CREATE:
+		//zxid := pb.ZxidFragment{int(in.Transaction.Zxid.Epoch), int(in.Transaction.Zxid.Counter)}
+		//ephemeral owner??
+		path, err := s.StateVector.Data.CreateNode(transaction.Path, transaction.Data, transaction.Flags&pb.EPHEMERAL != 0, 0, transaction.Zxid, transaction.Flags&pb.SEQUENTIAL != 0)
+		if err != nil {
+			log.Println(err)
+		}
+		log.Printf("node created at %s", path)
 
-//}
+	case pb.OperationType_UPDATE:
+		//Check node exists? Done here or in add into setdata method?
+		//zxid := pb.ZxidFragment{int(in.Transaction.Zxid.Epoch), int(in.Transaction.Zxid.Counter)}
+		//Version??
+		s.StateVector.Data.SetData(transaction.Path, transaction.Data, 0, transaction.Zxid)
+		log.Printf("node at %s updated", transaction.Path)
+	case pb.OperationType_DELETE:
+		outcome, err := s.StateVector.Data.DeleteNode(transaction.Path, 0)
+		if err != nil {
+			log.Println(err)
+		}
+		log.Println(outcome)
+
+	}
+	s.Lock()
+}
 
 // Phase 1 of ZAB
 func (s *Server) Discovery() {

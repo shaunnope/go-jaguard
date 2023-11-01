@@ -61,7 +61,7 @@ func Simulate(s *Server) {
 						Path:  "/foo",
 						Data:  data,
 						Type:  pb.OperationType_CREATE,
-						Flags: pb.Ephemeral | pb.Sequential,
+						Flags: pb.EPHEMERAL | pb.SEQUENTIAL,
 					},
 					RequestType: pb.RequestType_CLIENT,
 				}

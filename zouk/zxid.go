@@ -30,9 +30,9 @@ func (z ZxidFragment) Raw() *Zxid {
 }
 
 const (
-	Ephemeral = 1 << iota
-	Sequential
-	Regular
+	EPHEMERAL = 1 << iota
+	SEQUENTIAL
+	REGULAR
 )
 
 type TransactionFragment struct {

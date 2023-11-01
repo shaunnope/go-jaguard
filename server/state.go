@@ -1,6 +1,7 @@
 package main
 
 import (
+	"container/heap"
 	mu "sync"
 
 	pb "github.com/shaunnope/go-jaguard/zouk"
@@ -36,7 +37,7 @@ func (l *ZabLeader) Reset() {
 
 type Transactions = pb.TransactionFragments
 
-type PriorityQueue = pb.TransactionFragments
+type PriorityQueue []pb.TransactionFragment
 
 type StateVector struct {
 	mu.Mutex
@@ -49,7 +50,7 @@ type StateVector struct {
 
 	Connections map[int]*pb.NodeClient
 
-	CommitQueue   PriorityQueue
+	//CommitQueue   PriorityQueue
 	History       Transactions
 	AcceptedEpoch int // last NewEpoch
 	CurrentEpoch  int // last NewLeader
@@ -63,7 +64,6 @@ type StateVector struct {
 	Data *pb.DataTree
 }
 
-/*
 func (pq PriorityQueue) Len() int {
 	return len(pq)
 }
@@ -75,6 +75,14 @@ func (pq PriorityQueue) Less(i, j int) bool {
 
 func (pq PriorityQueue) Swap(i, j int) {
 	pq[i], pq[j] = pq[j], pq[i]
+}
+
+func (pq PriorityQueue) Peek() pb.TransactionFragment {
+	if len(pq) == 0 {
+		return pb.TransactionFragment{} // return empty transaction
+	}
+
+	return pq[0] // highest priority
 }
 
 func (pq *PriorityQueue) Pop() interface{} {
@@ -97,8 +105,6 @@ func (pq *PriorityQueue) Update(element pb.TransactionFragment) {
 		}
 	}
 }
-
-*/
 
 func NewStateVector(idx int) StateVector {
 	return StateVector{
