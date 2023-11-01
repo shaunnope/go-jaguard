@@ -3,10 +3,9 @@ package main
 import (
 	"context"
 	"errors"
+	pb "github.com/shaunnope/go-jaguard/zouk"
 	"log"
 	"sync"
-
-	pb "github.com/shaunnope/go-jaguard/zouk"
 )
 
 // grpc calls
@@ -142,6 +141,53 @@ func (s *Server) SendZabRequest(ctx context.Context, in *pb.ZabRequest) (*pb.Zab
 		// TODO: for each commit (announcement), wait until all earlier proposals are committed
 		// then, commit
 
+		// use priority queue because transactions may not arrive in order
+		// Check that transaction is at the start of the queue
+		// FOLLOWER need to execute request
+
+		/*
+			//transactionFragment := in.Transaction.Extract()
+			//s.CommitQueue.Push(transactionFragment)
+
+			//s.CommitQueue.Update(transactionFragment) //???
+
+			transaction := in.Transaction.Extract()
+
+			//wait until transaction is at the start of the queue
+
+			s.Unlock()
+			switch in.Transaction.Type {
+			case pb.OperationType_CREATE:
+				zxid := pb.ZxidFragment{int(in.Transaction.Zxid.Epoch), int(in.Transaction.Zxid.Counter)}
+				//ephemeral owner??
+				path, err := s.StateVector.Data.CreateNode(transaction.Path, transaction.Data, transaction.Flags&pb.EPHEMERAL != 0, 0, zxid, transaction.Flags&pb.SEQUENTIAL != 0)
+				if err != nil {
+					return nil, err
+				}
+				log.Printf("node created at %s", path)
+
+			case pb.OperationType_UPDATE:
+				//Check node exists? Done here or in add into setdata method?
+				zxid := pb.ZxidFragment{int(in.Transaction.Zxid.Epoch), int(in.Transaction.Zxid.Counter)}
+				//Version??
+				s.StateVector.Data.SetData(transaction.Path, transaction.Data, 0, zxid)
+				log.Printf("node at ")
+			case pb.OperationType_DELETE:
+				outcome, err := s.StateVector.Data.DeleteNode(in.Transaction.Path, 0)
+				if err != nil {
+					return nil, err
+				}
+				log.Println(outcome)
+
+			}
+			s.Lock()
+
+			//Remove transaction from CommitQueue
+			//Add transaction into History
+			s.History = append(s.History, in.Transaction.Extract())
+
+		*/
+
 	case pb.RequestType_CLIENT:
 		// if leader send proposal to all followers in for loop (rpc)
 		// since its rpc, leader will monitor for responses and decide whether to commit/announce
@@ -187,6 +233,8 @@ func (s *Server) SendZabRequest(ctx context.Context, in *pb.ZabRequest) (*pb.Zab
 				go SendGrpc[*pb.ZabRequest, *pb.ZabAck](pb.NodeClient.SendZabRequest, s, idx, msg, *maxTimeout)
 			}
 
+			// LEADER need to execute request
+
 		} else {
 			log.Printf("%d forwarding request to %d", s.Id, s.Vote.Id)
 			// todo verify version
@@ -196,16 +244,14 @@ func (s *Server) SendZabRequest(ctx context.Context, in *pb.ZabRequest) (*pb.Zab
 		}
 	}
 
-	switch in.Transaction.Type {
-	case pb.OperationType_WRITE:
-
-	case pb.OperationType_DELETE:
-	}
-
 	return nil, errors.New("zab request not accepted")
 }
 
 // end grpc calls
+
+//func (s *Server) HandleOperation() {
+
+//}
 
 // Phase 1 of ZAB
 func (s *Server) Discovery() {

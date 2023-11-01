@@ -36,6 +36,8 @@ func (l *ZabLeader) Reset() {
 
 type Transactions = pb.TransactionFragments
 
+type PriorityQueue = pb.TransactionFragments
+
 type StateVector struct {
 	mu.Mutex
 	Id       int
@@ -47,6 +49,7 @@ type StateVector struct {
 
 	Connections map[int]*pb.NodeClient
 
+	CommitQueue   PriorityQueue
 	History       Transactions
 	AcceptedEpoch int // last NewEpoch
 	CurrentEpoch  int // last NewLeader
@@ -59,6 +62,43 @@ type StateVector struct {
 	// TODO: save data tree to disk
 	Data *pb.DataTree
 }
+
+/*
+func (pq PriorityQueue) Len() int {
+	return len(pq)
+}
+
+// Less compares two zxids based on the priority rules (epoch first, then counter).
+func (pq PriorityQueue) Less(i, j int) bool {
+	return pq[i].Zxid.LessThan(pq[j].Zxid)
+}
+
+func (pq PriorityQueue) Swap(i, j int) {
+	pq[i], pq[j] = pq[j], pq[i]
+}
+
+func (pq *PriorityQueue) Pop() interface{} {
+	old := *pq
+	n := len(old)
+	item := old[n-1]
+	*pq = old[0 : n-1]
+	return item
+}
+
+func (pq *PriorityQueue) Push(x interface{}) {
+	*pq = append(*pq, x.(pb.TransactionFragment))
+}
+
+func (pq *PriorityQueue) Update(element pb.TransactionFragment) {
+	for i, item := range *pq {
+		if item.Zxid.Equal(element.Zxid) {
+			heap.Fix(pq, i)
+			return
+		}
+	}
+}
+
+*/
 
 func NewStateVector(idx int) StateVector {
 	return StateVector{

@@ -3,8 +3,9 @@ option go_package = "github.com/shaunnope/go-jaguard/zouk";
 
 enum OperationType {
     READ = 0;
-    WRITE = 1;
-    DELETE = 2;
+    CREATE = 1;
+    UPDATE = 2;
+    DELETE = 3;
 }
 
 message Zxid {
@@ -16,7 +17,7 @@ message Transaction {
     Zxid zxid = 1;
     string path = 2;
     bytes data = 3;
-    string flags = 4;
+    uint64 flags = 4;
     OperationType type = 5;
 }
 

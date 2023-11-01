@@ -4,13 +4,12 @@ import (
 	"context"
 	crand "crypto/rand"
 	"fmt"
-	"log"
-	"math/rand"
-	"time"
-
 	pb "github.com/shaunnope/go-jaguard/zouk"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"log"
+	"math/rand"
+	"time"
 )
 
 // Manual setup of server states
@@ -59,8 +58,10 @@ func Simulate(s *Server) {
 
 				req := &pb.ZabRequest{
 					Transaction: &pb.Transaction{
-						Path: "/foo",
-						Data: data,
+						Path:  "/foo",
+						Data:  data,
+						Type:  pb.OperationType_CREATE,
+						Flags: pb.Ephemeral | pb.Sequential,
 					},
 					RequestType: pb.RequestType_CLIENT,
 				}

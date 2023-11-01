@@ -29,11 +29,17 @@ func (z ZxidFragment) Raw() *Zxid {
 	return &Zxid{Epoch: int64(z.Epoch), Counter: int64(z.Counter)}
 }
 
+const (
+	Ephemeral = 1 << iota
+	Sequential
+	Regular
+)
+
 type TransactionFragment struct {
 	Zxid  ZxidFragment
 	Path  string
 	Data  []byte
-	Flags string
+	Flags uint64
 	Type  OperationType
 }
 
