@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"sync"
+	"time"
 
 	pb "github.com/shaunnope/go-jaguard/zouk"
 )
@@ -113,6 +113,7 @@ func (s *Server) ProposeLeader(ctx context.Context, in *pb.NewLeader) (*pb.AckLe
 
 	if int(in.Epoch) < s.AcceptedEpoch {
 		go func() {
+			// TODO
 		}()
 	}
 
@@ -122,6 +123,7 @@ func (s *Server) ProposeLeader(ctx context.Context, in *pb.NewLeader) (*pb.AckLe
 	return nil, errors.New("leader not accepted")
 }
 
+// gRPC call for Phase 3: Broadcast
 func (s *Server) SendZabRequest(ctx context.Context, in *pb.ZabRequest) (*pb.ZabAck, error) {
 	isLeader := s.GetState() == LEADING
 
@@ -148,7 +150,6 @@ func (s *Server) SendZabRequest(ctx context.Context, in *pb.ZabRequest) (*pb.Zab
 			return nil, errors.New("leaders shouldnt get announcements")
 		}
 
-		s.History = append(s.History, in.Transaction.Extract())
 		log.Printf("Follower's History: %+v", s.History)
 
 		// TODO: for each commit (announcement), wait until all earlier proposals are committed
@@ -191,10 +192,9 @@ func (s *Server) SendZabRequest(ctx context.Context, in *pb.ZabRequest) (*pb.Zab
 				4: 0,
 			}
 
-			wg := sync.WaitGroup{}
 			majoritySize := len(s.Leader.FollowerEpochs)/2 + 1
-			log.Printf("server %d need %v to reach majority", s.Id, majoritySize)
-			wg.Add(majoritySize)
+			// log.Printf("server %d need %v to reach majority", s.Id, majoritySize)
+			done := make(chan bool, majoritySize)
 
 			jsonData, err = json.MarshalIndent(s.Leader.FollowerEpochs, "", "  ")
 			if err != nil {
@@ -209,20 +209,22 @@ func (s *Server) SendZabRequest(ctx context.Context, in *pb.ZabRequest) (*pb.Zab
 				if idx == s.Id {
 					continue
 				}
-				log.Printf("server %d send proposal to %d with message: %v", s.Id, idx, msg.Transaction)
 				go func(i int) {
 					_, err := SendGrpc[*pb.ZabRequest, *pb.ZabAck](pb.NodeClient.SendZabRequest, s, i, msg, *maxTimeout)
 					if err == nil {
+						// NOTE: might have race condition on successfulSends
 						successfulSends++
 						log.Printf("Server %d gotten %d acknowledgement", s.Id, successfulSends)
 						if successfulSends <= majoritySize {
-							wg.Done()
+							done <- true
 						}
 					}
 				}(idx)
 			}
 			// wait for quorum
-			wg.Wait()
+			for len(done) < majoritySize {
+				time.Sleep(100 * time.Millisecond)
+			}
 			log.Printf("majority acknolwedge")
 
 			// commit
@@ -369,27 +371,6 @@ func (s *Server) ZabSync() {
 // Phase 3 utils
 
 func (s *Server) ZabCommit() {
-
-	switch s.State {
-	case FOLLOWING:
-
-	}
-}
-
-// Phase 3 of ZAB
-// the main phase for non-faulty operation
-
-func (s *Server) ZabBroadcast() {
-
-	// if leading, invoke ready (?)
-
-	// why lock here?
-	// state: read
-	// vote: read
-	// history?: write
-
-	s.Lock()
-	defer s.Unlock()
 
 	switch s.State {
 	case FOLLOWING:

@@ -77,7 +77,7 @@ func (m *ZabRequest) Error(from int, to int, err error) {
 }
 
 func (m *ZabRequest) Done(from int, to int) {
-	// log.Printf("%d sent zab request to %d", from, to)
+	log.Printf("%d sent zab request to %d: %v %v", from, to, m.RequestType, m.Transaction)
 }
 
 func (m *ZabAck) Error(from int, to int, err error) {
