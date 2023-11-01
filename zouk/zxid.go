@@ -1,5 +1,7 @@
 package zouk
 
+import "fmt"
+
 type ZxidFragment struct {
 	Epoch   int
 	Counter int
@@ -61,6 +63,18 @@ func (t *Transaction) Extract() TransactionFragment {
 		Flags: t.Flags,
 		Type:  t.Type,
 	}
+}
+
+func (t *Transaction) ExtractLog() TransactionFragment {
+	return TransactionFragment{
+		Zxid: t.Zxid.Extract(),
+		Path: t.Path,
+		Type: t.Type,
+	}
+}
+
+func (t *Transaction) ExtractLogString() string {
+	return fmt.Sprintf("Zxid: %v, REQUEST %s @ PATH: %s", t.Zxid.Extract(), t.Type, t.Path)
 }
 
 func (t *Transaction) WithZxid(z ZxidFragment) *Transaction {
