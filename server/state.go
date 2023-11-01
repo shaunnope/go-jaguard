@@ -68,6 +68,13 @@ func NewStateVector(idx int) StateVector {
 		Leader:      ZabLeader{FollowerEpochs: make(map[int]int), QuorumReady: make(chan bool)},
 		Data:        pb.NewDataTree(),
 		Stop:        make(chan bool),
+		Vote: pb.VoteFragment{
+			LastZxid: pb.ZxidFragment{
+				Epoch:   0,
+				Counter: 0,
+			},
+			Id: idx,
+		},
 	}
 }
 

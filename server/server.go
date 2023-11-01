@@ -50,9 +50,16 @@ func (s *Server) EstablishConnection(to int, timeout int) (context.Context, cont
 // Use reference to grpc server to stop it
 func (s *Server) Serve(grpc_s *grpc.Server) {
 	time.Sleep(500 * time.Millisecond)
+	if *leader_verbo {
+		log.Printf("server %d begins fast leader election ", s.Id)
+	}
 	vote := s.FastElection(*maxTimeout)
+	if *leader_verbo {
+		log.Printf("server %d vote for server %d whose zxid=%v ", s.Id, vote.Id, vote.LastZxid)
+	}
 
 	s.Setup(vote)
+	s.ElectBroadcast()
 	go s.Heartbeat()
 	time.Sleep(200 * time.Millisecond)
 
