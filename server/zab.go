@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	pb "github.com/shaunnope/go-jaguard/zouk"
@@ -133,12 +134,9 @@ func (s *Server) SendZabRequest(ctx context.Context, in *pb.ZabRequest) (*pb.Zab
 		if isLeader {
 			return nil, errors.New("leaders shouldnt get proposals")
 		}
-		log.Printf("%d received proposal: %v", s.Id, in.Transaction)
+		// log.Printf("%d received proposal: %s", s.Id, in.Transaction.ExtractLogString())
 
 		if int(in.Transaction.Zxid.Epoch) == s.CurrentEpoch {
-			// accept proposal
-			s.History = append(s.History, in.Transaction.Extract())
-			s.LastZxid = in.Transaction.Extract().Zxid
 			// send ack to leader
 			return &pb.ZabAck{Request: in}, nil
 		}
@@ -149,8 +147,11 @@ func (s *Server) SendZabRequest(ctx context.Context, in *pb.ZabRequest) (*pb.Zab
 		if isLeader {
 			return nil, errors.New("leaders shouldnt get announcements")
 		}
-
-		log.Printf("Follower's History: %+v", s.History)
+		// Commit the change to history
+		s.History = append(s.History, in.Transaction.ExtractLog())
+		s.LastZxid = in.Transaction.Extract().Zxid
+		// log.Printf("server %d get commit message\n", s.Id)
+		// log.Printf("Follower's History: %+v", s.History)
 
 		// TODO: for each commit (announcement), wait until all earlier proposals are committed
 		// then, commit
@@ -158,7 +159,9 @@ func (s *Server) SendZabRequest(ctx context.Context, in *pb.ZabRequest) (*pb.Zab
 		// @Shi Hiui: Follower commit change on local copy
 		// LEADER need to execute request
 		transaction := in.Transaction.Extract()
+		s.Lock()
 		s.HandleOperation(transaction)
+		defer s.Unlock()
 
 		return &pb.ZabAck{Request: in}, nil
 
@@ -167,44 +170,36 @@ func (s *Server) SendZabRequest(ctx context.Context, in *pb.ZabRequest) (*pb.Zab
 		// since its rpc, leader will monitor for responses and decide whether to commit/announce
 		// if follower forward to leader, do nothing with response (rpc)
 		if isLeader {
-			log.Printf("%d received client request: %v", s.Id, in.Transaction)
+			log.Printf("server %d received client request: %v", s.Id, in.Transaction)
 			// TODO: verify version
 			// propose to all
-
+			s.Lock()
 			msg := &pb.ZabRequest{
 				Transaction: in.Transaction.WithZxid(s.LastZxid.Inc()),
 				RequestType: pb.RequestType_PROPOSAL,
 			}
 
-			log.Printf("server %d with zxid %v", s.Id, s.LastZxid.Inc())
-
-			jsonData, err := json.MarshalIndent(in.Transaction, "", "  ")
-			if err != nil {
-				log.Fatalf("JSON Marshaling failed: %s", err)
-			}
-
-			fmt.Println(string(jsonData))
-
 			s.Leader.FollowerEpochs = map[int]int{
 				0: 0,
 				1: 0,
 				2: 0,
+				3: 0,
 				4: 0,
 			}
 
 			majoritySize := len(s.Leader.FollowerEpochs)/2 + 1
-			// log.Printf("server %d need %v to reach majority", s.Id, majoritySize)
+			log.Printf("server %d need %v to reach majority", s.Id, majoritySize)
 			done := make(chan bool, majoritySize)
 
-			jsonData, err = json.MarshalIndent(s.Leader.FollowerEpochs, "", "  ")
-			if err != nil {
-				log.Fatalf("JSON Marshaling failed: %s", err)
-			}
+			// jsonData, err := json.MarshalIndent(s.Leader.FollowerEpochs, "", "  ")
+			// if err != nil {
+			// 	log.Fatalf("JSON Marshaling failed: %s", err)
+			// }
 
-			fmt.Println(string(jsonData))
+			// fmt.Println(string(jsonData))
 			successfulSends := 0
 
-			log.Printf("server %d prepare to send message: %v", s.Id, msg.Transaction)
+			log.Printf("server %d prepare to send message: %s", s.Id, msg.Transaction.ExtractLogString())
 			for idx := range s.Leader.FollowerEpochs {
 				if idx == s.Id {
 					continue
@@ -214,7 +209,7 @@ func (s *Server) SendZabRequest(ctx context.Context, in *pb.ZabRequest) (*pb.Zab
 					if err == nil {
 						// NOTE: might have race condition on successfulSends
 						successfulSends++
-						log.Printf("Server %d gotten %d acknowledgement", s.Id, successfulSends)
+						// log.Printf("server %d gotten %d acknowledgement", s.Id, successfulSends)
 						if successfulSends <= majoritySize {
 							done <- true
 						}
@@ -223,12 +218,12 @@ func (s *Server) SendZabRequest(ctx context.Context, in *pb.ZabRequest) (*pb.Zab
 			}
 			// wait for quorum
 			for len(done) < majoritySize {
-				time.Sleep(100 * time.Millisecond)
 			}
-			log.Printf("majority acknolwedge")
+			log.Printf("server %d get quoram", s.Id)
 
 			// commit
-			s.History = append(s.History, in.Transaction.Extract())
+			s.History = append(s.History, in.Transaction.ExtractLog())
+			// s.History = append(s.History, in.Transaction.Extract())
 			s.LastZxid = msg.Transaction.Extract().Zxid
 
 			// @Shi Hui: Leader commit change on local copy
@@ -242,14 +237,12 @@ func (s *Server) SendZabRequest(ctx context.Context, in *pb.ZabRequest) (*pb.Zab
 					continue
 				}
 
-				go SendGrpc[*pb.ZabRequest, *pb.ZabAck](pb.NodeClient.SendZabRequest, s, idx, msg, *maxTimeout)
+				SendGrpc[*pb.ZabRequest, *pb.ZabAck](pb.NodeClient.SendZabRequest, s, idx, msg, *maxTimeout)
 			}
-
-			log.Printf("Leader's History: %+v", s.History)
-			log.Printf("Leader's Last Zxid: %+v", s.LastZxid)
+			defer s.Unlock()
 			return &pb.ZabAck{Request: in}, nil
 		} else {
-			log.Printf("%d forwarding request to %d", s.Id, s.Vote.Id)
+			log.Printf("server %d forwarding request to %d", s.Id, s.Vote.Id)
 			// todo verify version
 			// forward to leader
 			SendGrpc[*pb.ZabRequest, *pb.ZabAck](pb.NodeClient.SendZabRequest, s, s.Vote.Id, in, *maxTimeout)
@@ -267,16 +260,29 @@ func (s *Server) SendZabRequest(ctx context.Context, in *pb.ZabRequest) (*pb.Zab
 }
 
 func (s *Server) HandleOperation(transaction pb.TransactionFragment) {
-	//s.Unlock()
+
 	switch transaction.Type {
 	case pb.OperationType_WRITE:
 		//zxid := pb.ZxidFragment{int(in.Transaction.Zxid.Epoch), int(in.Transaction.Zxid.Counter)}
 		//ephemeral owner??
-		path, err := s.StateVector.Data.CreateNode(transaction.Path, transaction.Data, false, 1, transaction.Zxid, true)
+		_, err := s.StateVector.Data.CreateNode(transaction.Path, transaction.Data, false, 1, transaction.Zxid, false)
 		if err != nil {
 			log.Println(err)
 		}
-		log.Printf("node created at %s", path)
+		// log.Printf("server %d created znode @ PATH: %s", s.Id, path)
+		fileName := fmt.Sprintf("server%d.txt", s.Id)
+		file, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
+		if err != nil {
+			// Handle the error
+			fmt.Println("Error opening file:", err)
+			return
+		}
+		defer file.Close()
+		fmt.Fprintln(file, s.Id)
+		currentTime := time.Now().Format("2006/01/02 15:04:05")
+		fmt.Fprintf(file, "%s Updated Tree\n", currentTime)
+		printTree(s.StateVector.Data, file, "/", "")
+		fmt.Fprintln(file, "")
 
 	// case pb.OperationType_UPDATE:
 	// 	//Check node exists? Done here or in add into setdata method?
@@ -293,7 +299,7 @@ func (s *Server) HandleOperation(transaction pb.TransactionFragment) {
 		log.Println(outcome)
 
 	}
-	//s.Lock()
+
 }
 
 // end grpc calls

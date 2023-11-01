@@ -36,7 +36,7 @@ func (s *Server) Setup(vote pb.VoteFragment) {
 }
 
 // Simulate state evolution
-func Simulate(s *Server) {
+func Simulate(s *Server, path string) {
 	addr := fmt.Sprintf("%s:%d", config.Servers[s.Id].Host, config.Servers[s.Id].Port)
 	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
@@ -59,23 +59,7 @@ func Simulate(s *Server) {
 		req := &pb.ZabRequest{
 			Transaction: &pb.Transaction{
 				Zxid:  s.LastZxid.Inc().Raw(),
-				Path:  "/foo",
-				Data:  data,
-				Type:  1,
-				Flags: "someFlags",
-			},
-			RequestType: pb.RequestType_CLIENT,
-		}
-
-		_, err = c.SendZabRequest(ctx, req)
-		if err != nil {
-			log.Printf("%d error sending zab request: %v", s.Id, err)
-		}
-
-		req = &pb.ZabRequest{
-			Transaction: &pb.Transaction{
-				Zxid:  s.LastZxid.Inc().Raw(),
-				Path:  "/boo",
+				Path:  path,
 				Data:  data,
 				Type:  1,
 				Flags: "someFlags",

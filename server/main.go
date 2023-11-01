@@ -15,7 +15,11 @@ var (
 
 	idx = flag.Int("idx", 0, "server index")
 
-	maxTimeout = flag.Int("maxTimeout", 1000, "max timeout for election")
+	maxTimeout = flag.Int("maxTimeout", 100000, "max timeout for election")
+
+	multiple_req = flag.Bool("multiple_req", false, "Set to true if flag is present")
+	multiple_cli = flag.Bool("multiple_cli", false, "Set to true if flag is present")
+	leader_verbo = flag.Bool("leader_verbo", false, "Set to true if flag is present")
 )
 
 func parseConfig(path string) {
@@ -34,6 +38,14 @@ func main() {
 	parseConfig(*configPath)
 	// Run(*idx)
 	for idx := range config.Servers {
+		// Initialise each server's file as empty file
+		fileName := fmt.Sprintf("server%d.txt", idx)
+		_, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+		if err != nil {
+			// Handle the error
+			fmt.Println("Error opening file:", err)
+			return
+		}
 		go Run(idx)
 	}
 

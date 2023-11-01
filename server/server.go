@@ -49,7 +49,7 @@ func (s *Server) EstablishConnection(to int, timeout int) (context.Context, cont
 //
 // Use reference to grpc server to stop it
 func (s *Server) Serve(grpc_s *grpc.Server) {
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(500 * time.Millisecond)
 	vote := s.FastElection(*maxTimeout)
 
 	s.Setup(vote)
@@ -79,10 +79,20 @@ func Run(idx int) {
 
 	go node.Serve(grpc_s)
 
-	if idx == 1 {
+	if idx == 1 && *multiple_req {
 		log.Printf("server %d received request from client", idx)
-		Simulate(node)
-		// Simulate(node)
+		go Simulate(node, "/foo")
+		go Simulate(node, "/bar")
+	}
+
+	if idx == 2 && *multiple_cli {
+		log.Printf("server %d received request from client", idx)
+		go Simulate(node, "/cli2-1")
+	}
+
+	if idx == 3 && *multiple_cli {
+		log.Printf("server %d received request from client", idx)
+		go Simulate(node, "/cli3-1")
 	}
 
 	// start grpc service (blocking)

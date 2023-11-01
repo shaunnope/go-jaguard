@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"log"
 	"math"
 	"time"
 
@@ -129,7 +130,9 @@ func (s *Server) FastElection(t0 int) Vote {
 		case n = <-s.Queue:
 			nVote := n.Vote.Data()
 
-			// log.Printf("%d (%d) received %d (%d): %v", s.Id, s.Round, n.Id, n.Round, nVote)
+			if *leader_verbo {
+				log.Printf("%d (%d) received %d (%d): %v", s.Id, s.Round, n.Id, n.Round, nVote)
+			}
 
 			if State(n.State) == ELECTION {
 				if int(n.Round) > s.Round {
