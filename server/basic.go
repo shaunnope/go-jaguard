@@ -91,7 +91,7 @@ func Simulate(s *Server, path string) {
 		}
 
 		getDataReply, err := SendGrpc[*pb.GetDataRequest, *pb.GetDataResponse](pb.NodeClient.GetData, s, s.Vote.Id, &pb.GetDataRequest{Path: path, SetWatch: false}, *maxTimeout)
-		fmt.Printf("READ: Data of %s is: %t\n", path, getDataReply.Data)
+		fmt.Printf("READ: Data of %s is: %v\n", path, getDataReply.Data)
 		if err != nil {
 			log.Printf("%d error sending read request: %v\n", s.Id, err)
 			return

@@ -160,8 +160,9 @@ func (s *Server) SendZabRequest(ctx context.Context, in *pb.ZabRequest) (*pb.Zab
 		// LEADER need to execute request
 		transaction := in.Transaction.Extract()
 		s.Lock()
-		s.HandleOperation(transaction)
 		defer s.Unlock()
+		log.Printf("server %d update local copy", s.Id)
+		s.HandleOperation(transaction)
 
 		return &pb.ZabAck{Request: in}, nil
 
@@ -200,12 +201,16 @@ func (s *Server) SendZabRequest(ctx context.Context, in *pb.ZabRequest) (*pb.Zab
 			successfulSends := 0
 
 			log.Printf("server %d prepare to send message: %s", s.Id, msg.Transaction.ExtractLogString())
+			copiedMsg := &pb.ZabRequest{
+				Transaction: msg.Transaction,
+				RequestType: msg.RequestType,
+			}
 			for idx := range s.Leader.FollowerEpochs {
 				if idx == s.Id {
 					continue
 				}
 				go func(i int) {
-					_, err := SendGrpc[*pb.ZabRequest, *pb.ZabAck](pb.NodeClient.SendZabRequest, s, i, msg, *maxTimeout)
+					_, err := SendGrpc[*pb.ZabRequest, *pb.ZabAck](pb.NodeClient.SendZabRequest, s, i, copiedMsg, *maxTimeout)
 					if err == nil {
 						// NOTE: might have race condition on successfulSends
 						successfulSends++
@@ -237,6 +242,7 @@ func (s *Server) SendZabRequest(ctx context.Context, in *pb.ZabRequest) (*pb.Zab
 					continue
 				}
 
+				log.Printf("server %d sending ANNOUNCEMENT TO server %d with message %v", s.Id, idx, msg)
 				SendGrpc[*pb.ZabRequest, *pb.ZabAck](pb.NodeClient.SendZabRequest, s, idx, msg, *maxTimeout)
 			}
 			defer s.Unlock()
