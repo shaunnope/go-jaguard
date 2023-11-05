@@ -95,12 +95,6 @@ message ZabAck {
     ZabRequest request = 1;
 }
 
-message ReadResponse {
-    bytes data = 1;
-    string flags = 2;
-    Zxid zxid = 3;
-}
-
 
 message CreateRequest {
     string path = 1;
@@ -120,8 +114,39 @@ enum RequestType{
     CLIENT = 3;
 }
 
+// client read operations
+message GetDataRequest {
+    string path = 1;
+    bool setWatch = 2;
+    // @waishun, might need to add client IP and port
+}
 
+message GetDataResponse {
+    bytes data = 1;
+    Zxid zxid = 3;
+}
 
+message GetChildrenRequest {
+    string path = 1;
+    bool setWatch = 2;
+    // @waishun, might need to add client IP and port
+}
+
+message GetChildrenResponse {
+    repeated string children = 1;
+    Zxid zxid = 3;
+}
+
+message GetExistsRequest {
+    string path = 1;
+    bool setWatch = 2;
+    // @waishun, might need to add client IP and port
+}
+
+message GetExistsResponse {
+    bool exists = 1;
+    Zxid zxid = 3;
+}
 
 service Node {
     rpc SendPing (Ping) returns (Ping);
@@ -138,4 +163,10 @@ service Node {
     rpc SendZabRequest (ZabRequest) returns (ZabAck);
     
     rpc Create(CreateRequest) returns (CreateResponse);
+
+    // Client Read Operations
+    rpc GetData(GetDataRequest) returns (GetDataResponse);
+    rpc GetChildren(GetChildrenRequest) returns (GetChildrenResponse);
+    rpc GetExists(GetExistsRequest) returns (GetExistsResponse);
+
 }

@@ -36,7 +36,7 @@ func parseConfig(path string) {
 func main() {
 	flag.Parse()
 	parseConfig(*configPath)
-	// Run(*idx)
+
 	for idx := range config.Servers {
 		// Initialise each server's file as empty file
 		fileName := fmt.Sprintf("server%d.txt", idx)
@@ -46,6 +46,7 @@ func main() {
 			fmt.Println("Error opening file:", err)
 			return
 		}
+		// Start zookeeper server with index idx
 		go Run(idx)
 	}
 

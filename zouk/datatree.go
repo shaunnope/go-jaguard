@@ -189,50 +189,18 @@ func (dataTree *DataTree) CheckWatchTrigger(event *Event) {
 		node.SetWatches(removeTriggeredWatches(node.GetWatches(), Exists))
 		// Check for parent node
 		parentNode.SetWatches(removeTriggeredWatches(parentNode.GetWatches(), GetChildren))
-
-		// for _, watch := range node.GetWatches() {
-		// 	if watch.Type == Exists {
-		// 		fmt.Printf("Triggered: %s\n", watch.PrintWatch())
-		// 	}
-		// }
-		// for _, watch := range parentNode.GetWatches() {
-		// 	if watch.Type == GetChildren {
-		// 		fmt.Printf("Triggered: %s\n", watch.PrintWatch())
-		// 	}
-		// }
 	case Delete:
 		// Check for current node
 		node.SetWatches(removeTriggeredWatches(node.GetWatches(), Exists))
 		node.SetWatches(removeTriggeredWatches(node.GetWatches(), GetData))
 		// Check for parent node
 		parentNode.SetWatches(removeTriggeredWatches(parentNode.GetWatches(), GetChildren))
-
-		// for _, watch := range node.GetWatches() {
-		// 	if watch.Type == Exists || watch.Type == GetData {
-		// 		fmt.Printf("Triggered: %s\n", watch.PrintWatch())
-		// 	}
-		// }
-		// for _, watch := range parentNode.GetWatches() {
-		// 	if watch.Type == GetChildren {
-		// 		fmt.Printf("Triggered: %s\n", watch.PrintWatch())
-		// 	}
-		// }
 	case Change:
 		// Check for current node
 		node.SetWatches(removeTriggeredWatches(node.GetWatches(), Exists))
 		node.SetWatches(removeTriggeredWatches(node.GetWatches(), GetData))
-		// for _, watch := range node.GetWatches() {
-		// 	if watch.Type == Exists || watch.Type == GetData {
-		// 		fmt.Printf("Triggered: %s\n", watch.PrintWatch())
-		// 	}
-		// }
 	case Child:
 		parentNode.SetWatches(removeTriggeredWatches(parentNode.GetWatches(), GetChildren))
-		// for _, watch := range parentNode.GetWatches() {
-		// 	if watch.Type == GetChildren {
-		// 		fmt.Printf("Triggered: %s\n", watch.PrintWatch())
-		// 	}
-		// }
 	}
 	fmt.Println("Done checking watches")
 }
@@ -268,7 +236,3 @@ func (dataTree *DataTree) GetPaths() string {
 	}
 	return strings.Join(keys, ", ")
 }
-
-// addWatch
-// getEphermerals
-// removeWatch

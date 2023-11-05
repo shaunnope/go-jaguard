@@ -87,3 +87,51 @@ func (m *ZabAck) Error(from int, to int, err error) {
 func (m *ZabAck) Done(from int, to int) {
 	// log.Printf("%d sent zab ack to %d", from, to)
 }
+
+func (m *GetChildrenRequest) Error(from int, to int, err error) {
+	log.Printf("%d error sending getChildren request to %d: %v", from, to, err)
+}
+
+func (m *GetChildrenRequest) Done(from int, to int) {
+	// log.Printf("%d sent getChildren request to %d", from, to)
+}
+
+func (m *GetChildrenResponse) Error(from int, to int, err error) {
+	log.Printf("%d error sending getChildren response to %d: %v", from, to, err)
+}
+
+func (m *GetChildrenResponse) Done(from int, to int) {
+	// log.Printf("%d sent getChildren response to %d", from, to)
+}
+
+func (m *GetDataRequest) Error(from int, to int, err error) {
+	log.Printf("%d error sending getData request to %d: %v", from, to, err)
+}
+
+func (m *GetDataRequest) Done(from int, to int) {
+	// log.Printf("%d sent getData request to %d", from, to)
+}
+
+func (m *GetDataResponse) Error(from int, to int, err error) {
+	log.Printf("%d error sending getData response to %d: %v", from, to, err)
+}
+
+func (m *GetDataResponse) Done(from int, to int) {
+	// log.Printf("%d sent getData response to %d", from, to)
+}
+
+func (m *GetExistsRequest) Error(from int, to int, err error) {
+	log.Printf("%d error sending getExists request to %d: %v", from, to, err)
+}
+
+func (m *GetExistsRequest) Done(from int, to int) {
+	// log.Printf("%d sent getExists request to %d", from, to)
+}
+
+func (m *GetExistsResponse) Error(from int, to int, err error) {
+	log.Printf("%d error sending getExists response to %d: %v", from, to, err)
+}
+
+func (m *GetExistsResponse) Done(from int, to int) {
+	// log.Printf("%d sent getExists response to %d", from, to)
+}

@@ -27,6 +27,33 @@ func (s *Server) SendPing(ctx context.Context, in *pb.Ping) (*pb.Ping, error) {
 	return &pb.Ping{Data: int64(s.Id)}, nil
 }
 
+// TODO: SetWatch
+
+func (s *Server) GetExists(ctx context.Context, in *pb.GetExistsRequest) (*pb.GetExistsResponse, error) {
+	node, err := s.StateVector.Data.GetNode(in.Path)
+	if node == nil {
+		return &pb.GetExistsResponse{Exists: false, Zxid: s.LastZxid.Inc().Raw()}, err
+	}
+	return &pb.GetExistsResponse{Exists: true, Zxid: s.LastZxid.Inc().Raw()}, err
+}
+
+func (s *Server) GetData(ctx context.Context, in *pb.GetDataRequest) (*pb.GetDataResponse, error) {
+	data, err := s.StateVector.Data.GetData(in.Path)
+
+	return &pb.GetDataResponse{Data: data, Zxid: s.LastZxid.Inc().Raw()}, err
+}
+
+func (s *Server) GetChildren(ctx context.Context, in *pb.GetChildrenRequest) (*pb.GetChildrenResponse, error) {
+	children, err := s.StateVector.Data.GetNodeChildren(in.Path)
+	//Type conversion
+	out := make([]string, 0)
+	for key := range children {
+		out = append(out, key)
+	}
+
+	return &pb.GetChildrenResponse{Children: out, Zxid: s.LastZxid.Inc().Raw()}, err
+}
+
 // Establish connection to another server
 func (s *Server) EstablishConnection(to int, timeout int) (context.Context, context.CancelFunc) {
 	if to == s.Id {
@@ -80,10 +107,12 @@ func Run(idx int) {
 		log.Fatalf("failed to listen: %v", err)
 	}
 	grpc_s := grpc.NewServer()
+	// Server Object that handles gRPC requests
 	node := NewNode(idx)
 	pb.RegisterNodeServer(grpc_s, node)
 	log.Printf("server %d listening at %v", idx, lis.Addr())
 
+	// Run fast election then maintain heartbeat
 	go node.Serve(grpc_s)
 
 	if idx == 1 && *multiple_req {
