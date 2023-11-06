@@ -10,7 +10,7 @@
 ├── server
 └── zouk
 ```
-Jaguard has 3 main directories. Loosely speaking,  `client` and `server` deal with networking and read/write operations, while `zouk` deals with znodes, zookeeper protocol implementation and grpc interfaces.
+Jaguard has 3 main directories. Loosely speaking, `client` and `server` deal with networking and read/write operations, while `zouk` deals with znodes, zookeeper protocol implementation and grpc interfaces.
 
 <details open><summary>Client</summary>
 
@@ -52,5 +52,14 @@ Jaguard has 3 main directories. Loosely speaking,  `client` and `server` deal wi
 └── zxid.go
 ```
 </details>
+
+## Implementation
+
+datatree is implemented as a hashmap, to optimise read operations to the leaves of the tree.
+
+```
+key       : value
+tree path : pointer to node
+```
 
 ## Issues
