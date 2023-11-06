@@ -3,7 +3,6 @@
 ## Structure
 ```
 # top level directory
-.
 ├── build.sh
 ├── client
 ├── config.json
@@ -16,10 +15,8 @@ Jaguard has 3 main directories. Loosely speaking,  `client` and `server` deal wi
 <details open><summary>Client</summary>
 
 ```
-├── client_config
 └── client_main.go
 ```
-
 </details>
 
 <details open><summary>Server</summary>
@@ -33,7 +30,6 @@ Jaguard has 3 main directories. Loosely speaking,  `client` and `server` deal wi
 ├── main.go
 ├── messages.go
 ├── server.go
-├── server_config
 ├── state.go
 ├── vote.go
 ├── write.go
@@ -46,8 +42,6 @@ Jaguard has 3 main directories. Loosely speaking,  `client` and `server` deal wi
 ```
 ├── datatree.go
 ├── event.go
-├── go.mod
-├── go.sum
 ├── messages.go
 ├── vote.go
 ├── watch.go
