@@ -107,6 +107,71 @@ Loop:
 				fmt.Printf("READ: %s exist: %t\n", path, getExists.Exists)
 			}
 
+		case "create":
+			fmt.Printf("Executing create: %s\n", &command)
+
+			path := command[1]
+			data := command[2]
+			// isSequential := false
+			// if len(command) == 4 {
+			// 	optionInput := command[3]
+			// 	if optionInput == "-s" {
+			// 		isSequential = true
+			// 	}
+			// }
+
+			//TODO: Fix the flag data format
+			createRequest, err := SendClientGrpc[*pb.CUDRequest, *pb.CUDResponse](pb.NodeClient.HandleClientCUD, &pb.CUDRequest{Path: path, Data: []byte(data), Flags: "", OperationType: pb.OperationType_WRITE}, *maxTimeout)
+
+			if err != nil {
+				log.Printf("Error sending create request: %s\n", err)
+			} else {
+				fmt.Printf("WRITE: %s is accepted: %t\n", path, *createRequest.Accept)
+			}
+
+		case "set":
+			fmt.Printf("Executing set: %s\n", &command)
+
+			path := command[1]
+			data := command[2]
+			// isSequential := false
+			// if len(command) == 4 {
+			// 	optionInput := command[3]
+			// 	if optionInput == "-s" {
+			// 		isSequential = true
+			// 	}
+			// }
+
+			//TODO: Fix the flag data format
+			setRequest, err := SendClientGrpc[*pb.CUDRequest, *pb.CUDResponse](pb.NodeClient.HandleClientCUD, &pb.CUDRequest{Path: path, Data: []byte(data), Flags: "", OperationType: pb.OperationType_UPDATE}, *maxTimeout)
+
+			if err != nil {
+				log.Printf("Error sending set request: %s\n", err)
+			} else {
+				fmt.Printf("SET: %s is accepted: %t\n", path, *setRequest.Accept)
+			}
+
+		case "delete":
+			fmt.Printf("Executing set: %s\n", &command)
+
+			path := command[1]
+			// isSequential := false
+			// if len(command) == 4 {
+			// 	optionInput := command[3]
+			// 	if optionInput == "-s" {
+			// 		isSequential = true
+			// 	}
+			// }
+
+			//TODO: Fix the flag data format
+			deleteRequest, err := SendClientGrpc[*pb.CUDRequest, *pb.CUDResponse](pb.NodeClient.HandleClientCUD, &pb.CUDRequest{Path: path, Flags: "", OperationType: pb.OperationType_DELETE}, *maxTimeout)
+
+			if err != nil {
+				log.Printf("Error sending delete request: %s\n", err)
+			} else {
+				fmt.Printf("DELETE: %s is accepted: %t\n", path, *deleteRequest.Accept)
+			}
+
 		case "q":
 			fmt.Println("Quiting...")
 			break Loop
