@@ -57,20 +57,18 @@ func Simulate(s *Server, path string) {
 			log.Printf("c%d error generating random data: %v", s.Id, err)
 		}
 
-		req := &pb.ZabRequest{
-			Transaction: &pb.Transaction{
-				Zxid:  s.LastZxid.Inc().Raw(),
-				Path:  path,
-				Data:  data,
-				Type:  1,
-				Flags: "someFlags",
-			},
-			RequestType: pb.RequestType_CLIENT,
+		req := &pb.CUDRequest{
+			Path:          path,
+			Data:          data,
+			Flags:         "",
+			OperationType: pb.OperationType_WRITE,
 		}
 
-		_, err = c.SendZabRequest(ctx, req)
+		cudReply, err := c.HandleClientCUD(ctx, req)
 		if err != nil {
 			log.Printf("%d error sending zab request: %v", s.Id, err)
+		} else {
+			log.Printf("Writing new node in path %s is :%t", path, *cudReply.Accept)
 		}
 
 		// Preparing client to try and getChildren
@@ -98,32 +96,4 @@ func Simulate(s *Server, path string) {
 		}
 	}()
 
-	// for {
-	// 	if rand.Intn(100) < 10 {
-	// 		go func() {
-	// 			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(*maxTimeout)*time.Millisecond)
-	// 			defer cancel()
-
-	// 			data := make([]byte, 10)
-	// 			_, err := crand.Read(data)
-	// 			if err != nil {
-	// 				log.Printf("c%d error generating random data: %v", s.Id, err)
-	// 			}
-
-	// 			req := &pb.ZabRequest{
-	// 				Transaction: &pb.Transaction{
-	// 					Path: "/foo",
-	// 					Data: data,
-	// 				},
-	// 				RequestType: pb.RequestType_CLIENT,
-	// 			}
-
-	// 			_, err = c.SendZabRequest(ctx, req)
-	// 			if err != nil {
-	// 				log.Printf("%d error sending zab request: %v", s.Id, err)
-	// 			}
-	// 		}()
-	// 	}
-	// 	time.Sleep(time.Duration(rand.Intn(5000)) * time.Millisecond)
-	// }
 }

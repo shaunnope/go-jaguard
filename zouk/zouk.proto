@@ -5,6 +5,7 @@ enum OperationType {
     READ = 0;
     WRITE = 1;
     DELETE = 2;
+    UPDATE = 3;
 }
 
 message Zxid {
@@ -23,20 +24,6 @@ message Transaction {
 message Ping {
     int64 data = 1;
 }
-
-// dynamic zookeeper nodes
-message AddNodeRequest {
-    string server = 1;
-}
-
-message AddNodeResponse {}
-
-message RemoveNodeRequest {
-    string server = 1;
-}
-
-message RemoveNodeResponse {}
-// end dynamic zookeeper nodes
 
 // election
 message Vote {
@@ -95,23 +82,9 @@ message ZabAck {
     ZabRequest request = 1;
 }
 
-
-message CreateRequest {
-    string path = 1;
-    bytes data = 2;
-    string flags = 3;
-    RequestType requestType = 4;
-}
-
-message CreateResponse {
-    optional bool accept = 1;
-    optional CreateRequest CR = 2;
-}
-
 enum RequestType{
     PROPOSAL = 0;
     ANNOUNCEMENT = 1;
-    CLIENT = 3;
 }
 
 // client read operations
@@ -148,11 +121,19 @@ message GetExistsResponse {
     Zxid zxid = 3;
 }
 
+message CUDRequest {
+    string path = 1;
+    bytes data = 2;
+    string flags = 3;
+    OperationType operationType = 4;
+}
+
+message CUDResponse {
+    optional bool accept = 1;
+}
+
 service Node {
     rpc SendPing (Ping) returns (Ping);
-
-    rpc AddNode (AddNodeRequest) returns (AddNodeResponse);
-    rpc RemoveNode (RemoveNodeRequest) returns (RemoveNodeResponse);
 
     rpc Elect (ElectNotification) returns (ElectResponse);
 
@@ -162,11 +143,11 @@ service Node {
 
     rpc SendZabRequest (ZabRequest) returns (ZabAck);
     
-    rpc Create(CreateRequest) returns (CreateResponse);
-
     // Client Read Operations
     rpc GetData(GetDataRequest) returns (GetDataResponse);
     rpc GetChildren(GetChildrenRequest) returns (GetChildrenResponse);
     rpc GetExists(GetExistsRequest) returns (GetExistsResponse);
 
+    // Client CUD Operations
+    rpc HandleClientCUD(CUDRequest) returns (CUDResponse);
 }

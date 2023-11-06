@@ -135,3 +135,19 @@ func (m *GetExistsResponse) Error(from int, to int, err error) {
 func (m *GetExistsResponse) Done(from int, to int) {
 	// log.Printf("%d sent getExists response to %d", from, to)
 }
+
+func (m *CUDRequest) Error(from int, to int, err error) {
+	log.Printf("%d error sending create node request to %d: %v", from, to, err)
+}
+
+func (m *CUDRequest) Done(from int, to int) {
+	// log.Printf("%d sent getExists response to %d", from, to)
+}
+
+func (m *CUDResponse) Error(from int, to int, err error) {
+	log.Printf("%d error sending create node response to %d: %v", from, to, err)
+}
+
+func (m *CUDResponse) Done(from int, to int) {
+	// log.Printf("%d sent getExists response to %d", from, to)
+}
