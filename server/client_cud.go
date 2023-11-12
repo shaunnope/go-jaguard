@@ -24,7 +24,7 @@ func (s *Server) HandleClientCUD(ctx context.Context, in *pb.CUDRequest) (*pb.CU
 				Path:  in.Path,
 				Data:  in.Data,
 				Type:  in.OperationType,
-				Flags: "",
+				Flags: &pb.Flag{IsSequential: in.Flags.IsSequential, IsEphemeral: in.Flags.IsEphemeral},
 			},
 			RequestType: pb.RequestType_PROPOSAL,
 		}
@@ -76,7 +76,7 @@ func (s *Server) HandleClientCUD(ctx context.Context, in *pb.CUDRequest) (*pb.CU
 		// @Shi Hui: Leader commit change on local copy
 		// LEADER need to execute request
 		transaction := msg.Transaction.Extract()
-		s.HandleOperation(transaction)
+		_, err := s.HandleOperation(transaction)
 
 		msg.RequestType = pb.RequestType_ANNOUNCEMENT
 		for idx := range s.Leader.FollowerEpochs {
@@ -89,7 +89,7 @@ func (s *Server) HandleClientCUD(ctx context.Context, in *pb.CUDRequest) (*pb.CU
 		}
 		defer s.Unlock()
 		accepted := true
-		return &pb.CUDResponse{Accept: &accepted}, nil
+		return &pb.CUDResponse{Accept: &accepted}, err
 	} else {
 		log.Printf("server %d forwarding request to %d", s.Id, s.Vote.Id)
 		// todo verify version

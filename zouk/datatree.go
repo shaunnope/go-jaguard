@@ -92,9 +92,13 @@ func (dataTree *DataTree) DeleteNode(path string, zxid int64) (string, error) {
 
 	lastSlashIndex := strings.LastIndex(path, PATH_SEP)
 	parentName := path[:lastSlashIndex]
+	if parentName == "" {
+		parentName = "/"
+	}
 	childName := path[lastSlashIndex:]
 	parentNode, ok := dataTree.NodeMap[parentName]
 	if !ok {
+		fmt.Printf("parentName:%s, childName:%s", parentName, childName)
 		return parentName, errors.New("invalid parent name")
 	}
 

@@ -60,7 +60,7 @@ func Simulate(s *Server, path string) {
 		req := &pb.CUDRequest{
 			Path:          path,
 			Data:          data,
-			Flags:         "",
+			Flags:         &pb.Flag{IsSequential: false, IsEphemeral: false},
 			OperationType: pb.OperationType_WRITE,
 		}
 

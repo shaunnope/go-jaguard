@@ -162,9 +162,9 @@ func (s *Server) SendZabRequest(ctx context.Context, in *pb.ZabRequest) (*pb.Zab
 		s.Lock()
 		defer s.Unlock()
 		log.Printf("server %d update local copy", s.Id)
-		s.HandleOperation(transaction)
+		_, err := s.HandleOperation(transaction)
 
-		return &pb.ZabAck{Request: in}, nil
+		return &pb.ZabAck{Request: in}, err
 	}
 
 	switch in.Transaction.Type {
@@ -176,15 +176,17 @@ func (s *Server) SendZabRequest(ctx context.Context, in *pb.ZabRequest) (*pb.Zab
 	return nil, errors.New("zab request not accepted")
 }
 
-func (s *Server) HandleOperation(transaction pb.TransactionFragment) {
+func (s *Server) HandleOperation(transaction pb.TransactionFragment) (string, error) {
 
 	switch transaction.Type {
 	case pb.OperationType_WRITE:
 		//zxid := pb.ZxidFragment{int(in.Transaction.Zxid.Epoch), int(in.Transaction.Zxid.Counter)}
 		//ephemeral owner??
-		_, err := s.StateVector.Data.CreateNode(transaction.Path, transaction.Data, false, 1, transaction.Zxid, false)
+		_, err := s.StateVector.Data.CreateNode(transaction.Path, transaction.Data, transaction.Flags.IsEphemeral, 1, transaction.Zxid, transaction.Flags.IsSequential)
 		if err != nil {
 			log.Println(err)
+			fmt.Println("Error:", err)
+			return "", err
 		}
 		// log.Printf("server %d created znode @ PATH: %s", s.Id, path)
 		fileName := fmt.Sprintf("server%d.txt", s.Id)
@@ -192,7 +194,7 @@ func (s *Server) HandleOperation(transaction pb.TransactionFragment) {
 		if err != nil {
 			// Handle the error
 			fmt.Println("Error opening file:", err)
-			return
+			return "", err
 		}
 		defer file.Close()
 		fmt.Fprintln(file, s.Id)
@@ -200,6 +202,7 @@ func (s *Server) HandleOperation(transaction pb.TransactionFragment) {
 		fmt.Fprintf(file, "%s Updated Tree\n", currentTime)
 		printTree(s.StateVector.Data, file, "/", "")
 		fmt.Fprintln(file, "")
+		return "Success", nil
 
 	case pb.OperationType_UPDATE:
 		//Check node exists? Done here or in add into setdata method?
@@ -207,16 +210,18 @@ func (s *Server) HandleOperation(transaction pb.TransactionFragment) {
 		//Version??
 		s.StateVector.Data.SetData(transaction.Path, transaction.Data, 0, transaction.Zxid)
 		log.Printf("node at %s updated", transaction.Path)
+		return "Success", nil
 
 	case pb.OperationType_DELETE:
-		outcome, err := s.StateVector.Data.DeleteNode(transaction.Path, 0)
+		outcome, err := s.StateVector.Data.DeleteNode(transaction.Path, transaction.Zxid.Raw().Counter)
 		if err != nil {
 			log.Println(err)
+			return "", err
 		}
 		log.Println(outcome)
-
+		return "Success", nil
 	}
-
+	return "", &json.UnsupportedValueError{Str: "Unsupported pb.OperationType"}
 }
 
 // end grpc calls

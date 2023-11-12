@@ -36,6 +36,29 @@ func listHelp() {
 	fmt.Println("	q")
 	fmt.Println("----------------------")
 }
+func parseReadCommand(command []string) (string, bool, error) {
+	// Expect at least 2 elements in command (including the 'ls' itself)
+	if len(command) < 2 {
+		return "", false, fmt.Errorf("unknown argument '%s' for command", command)
+	}
+
+	path := command[1]
+	setWatch := false
+
+	// Check if there are more arguments, and if so, process them
+	if len(command) > 2 {
+		for _, arg := range command[2:] {
+			switch arg {
+			case "-w":
+				setWatch = true
+			default:
+				return "", false, fmt.Errorf("unknown argument '%s' for command", arg)
+			}
+		}
+	}
+
+	return path, setWatch, nil
+}
 
 func menu() {
 	input := bufio.NewScanner(os.Stdin)
@@ -51,14 +74,10 @@ Loop:
 		case "ls":
 			fmt.Printf("Executing ls: %s\n", command)
 
-			//TODO: Function to better parse Command
-			path := command[1]
-			setWatch := false
-			if len(command) == 3 {
-				optionInput := command[2]
-				if optionInput == "-w" {
-					setWatch = true
-				}
+			path, setWatch, err := parseReadCommand(command)
+			if err != nil {
+				log.Printf("%s\n", err)
+				break
 			}
 
 			getChildrenReply, err := SendClientGrpc[*pb.GetChildrenRequest, *pb.GetChildrenResponse](pb.NodeClient.GetChildren, &pb.GetChildrenRequest{Path: path, SetWatch: setWatch}, *maxTimeout)
@@ -71,13 +90,10 @@ Loop:
 		case "get":
 			fmt.Printf("Executing get: %s\n", &command)
 
-			path := command[1]
-			setWatch := false
-			if len(command) == 3 {
-				optionInput := command[2]
-				if optionInput == "-w" {
-					setWatch = true
-				}
+			path, setWatch, err := parseReadCommand(command)
+			if err != nil {
+				log.Printf("%s\n", err)
+				break
 			}
 
 			getData, err := SendClientGrpc[*pb.GetDataRequest, *pb.GetDataResponse](pb.NodeClient.GetData, &pb.GetDataRequest{Path: path, SetWatch: setWatch}, *maxTimeout)
@@ -90,13 +106,10 @@ Loop:
 		case "getExists":
 			fmt.Printf("Executing getExists: %s\n", &command)
 
-			path := command[1]
-			setWatch := false
-			if len(command) == 3 {
-				optionInput := command[2]
-				if optionInput == "-w" {
-					setWatch = true
-				}
+			path, setWatch, err := parseReadCommand(command)
+			if err != nil {
+				log.Printf("%s\n", err)
+				break
 			}
 
 			getExists, err := SendClientGrpc[*pb.GetExistsRequest, *pb.GetExistsResponse](pb.NodeClient.GetExists, &pb.GetExistsRequest{Path: path, SetWatch: setWatch}, *maxTimeout)
@@ -110,18 +123,40 @@ Loop:
 		case "create":
 			fmt.Printf("Executing create: %s\n", &command)
 
+			if len(command) < 2 {
+				fmt.Println("Not enough arguments for 'create' command")
+				break
+			}
 			path := command[1]
-			data := command[2]
-			// isSequential := false
-			// if len(command) == 4 {
-			// 	optionInput := command[3]
-			// 	if optionInput == "-s" {
-			// 		isSequential = true
-			// 	}
-			// }
+			var data []byte
+			setSequential := false
+			setEphemeral := false
 
-			//TODO: Fix the flag data format
-			createRequest, err := SendClientGrpc[*pb.CUDRequest, *pb.CUDResponse](pb.NodeClient.HandleClientCUD, &pb.CUDRequest{Path: path, Data: []byte(data), Flags: "", OperationType: pb.OperationType_WRITE}, *maxTimeout)
+			switch len(command) {
+			case 3:
+				if command[2] == "-s" {
+					setSequential = true
+				} else if command[2] == "-e" {
+					setEphemeral = true
+				} else {
+					data = []byte(command[2])
+				}
+			case 4:
+				data = []byte(command[2])
+				if command[3] == "-s" {
+					setSequential = true
+				}
+			case 5:
+				data = []byte(command[2])
+				if command[3] == "-s" || command[4] == "-s" {
+					setSequential = true
+				}
+				if command[3] == "-e" || command[4] == "-e" {
+					setEphemeral = true
+				}
+
+			}
+			createRequest, err := SendClientGrpc[*pb.CUDRequest, *pb.CUDResponse](pb.NodeClient.HandleClientCUD, &pb.CUDRequest{Path: path, Data: []byte(data), Flags: &pb.Flag{IsSequential: setSequential, IsEphemeral: setEphemeral}, OperationType: pb.OperationType_WRITE}, *maxTimeout)
 
 			if err != nil {
 				log.Printf("Error sending create request: %s\n", err)
@@ -132,18 +167,15 @@ Loop:
 		case "set":
 			fmt.Printf("Executing set: %s\n", &command)
 
+			if len(command) < 3 {
+				fmt.Println("not enough arguments for 'set' command")
+				break
+			}
+
 			path := command[1]
 			data := command[2]
-			// isSequential := false
-			// if len(command) == 4 {
-			// 	optionInput := command[3]
-			// 	if optionInput == "-s" {
-			// 		isSequential = true
-			// 	}
-			// }
 
-			//TODO: Fix the flag data format
-			setRequest, err := SendClientGrpc[*pb.CUDRequest, *pb.CUDResponse](pb.NodeClient.HandleClientCUD, &pb.CUDRequest{Path: path, Data: []byte(data), Flags: "", OperationType: pb.OperationType_UPDATE}, *maxTimeout)
+			setRequest, err := SendClientGrpc[*pb.CUDRequest, *pb.CUDResponse](pb.NodeClient.HandleClientCUD, &pb.CUDRequest{Path: path, Data: []byte(data), Flags: &pb.Flag{IsSequential: false, IsEphemeral: false}, OperationType: pb.OperationType_UPDATE}, *maxTimeout)
 
 			if err != nil {
 				log.Printf("Error sending set request: %s\n", err)
@@ -154,17 +186,14 @@ Loop:
 		case "delete":
 			fmt.Printf("Executing set: %s\n", &command)
 
-			path := command[1]
-			// isSequential := false
-			// if len(command) == 4 {
-			// 	optionInput := command[3]
-			// 	if optionInput == "-s" {
-			// 		isSequential = true
-			// 	}
-			// }
+			if len(command) < 2 {
+				fmt.Println("not enough arguments for 'delete' command")
+				break
+			}
 
-			//TODO: Fix the flag data format
-			deleteRequest, err := SendClientGrpc[*pb.CUDRequest, *pb.CUDResponse](pb.NodeClient.HandleClientCUD, &pb.CUDRequest{Path: path, Flags: "", OperationType: pb.OperationType_DELETE}, *maxTimeout)
+			path := command[1]
+
+			deleteRequest, err := SendClientGrpc[*pb.CUDRequest, *pb.CUDResponse](pb.NodeClient.HandleClientCUD, &pb.CUDRequest{Path: path, Flags: &pb.Flag{IsSequential: false, IsEphemeral: false}, OperationType: pb.OperationType_DELETE}, *maxTimeout)
 
 			if err != nil {
 				log.Printf("Error sending delete request: %s\n", err)

@@ -35,7 +35,7 @@ type TransactionFragment struct {
 	Zxid  ZxidFragment
 	Path  string
 	Data  []byte
-	Flags string
+	Flags *Flag
 	Type  OperationType
 }
 

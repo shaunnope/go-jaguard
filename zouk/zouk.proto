@@ -13,11 +13,16 @@ message Zxid {
     int64 counter = 2;
 }
 
+message Flag {
+    bool isSequential = 1;
+    bool isEphemeral = 2;
+}
+
 message Transaction {
     Zxid zxid = 1;
     string path = 2;
     bytes data = 3;
-    string flags = 4;
+    Flag flags = 4;
     OperationType type = 5;
 }
 
@@ -124,7 +129,7 @@ message GetExistsResponse {
 message CUDRequest {
     string path = 1;
     bytes data = 2;
-    string flags = 3;
+    Flag flags = 3;
     OperationType operationType = 4;
 }
 
