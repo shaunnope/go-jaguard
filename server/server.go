@@ -98,6 +98,7 @@ func (s *Server) Serve(grpc_s *grpc.Server) {
 
 	<-s.Stop
 	grpc_s.GracefulStop()
+	log.Printf("server %d stopped", s.Id)
 }
 
 func Run(idx int) {
@@ -111,9 +112,14 @@ func Run(idx int) {
 	node := NewNode(idx)
 	pb.RegisterNodeServer(grpc_s, node)
 	log.Printf("server %d listening at %v", idx, lis.Addr())
-
-	// Run fast election then maintain heartbeat
-	go node.Serve(grpc_s)
+	go func() {
+		// restart server if it fails
+		for {
+			// Run fast election then maintain heartbeat
+			node.Serve(grpc_s)
+			time.Sleep(100 * time.Millisecond)
+		}
+	}()
 
 	if idx == 1 && *multiple_req {
 		log.Printf("server %d received request from client", idx)
