@@ -1,6 +1,9 @@
 package zouk
 
-import "log"
+import (
+	"log"
+	"log/slog"
+)
 
 // Interface for messages
 type Message interface {
@@ -9,11 +12,12 @@ type Message interface {
 }
 
 func (m *NewEpoch) Error(from int, to int, err error) {
-	log.Printf("%d error sending epoch to %d: %v", from, to, err)
+	slog.Error("NewEpoch", "from", from, "to", to, "err", err)
+	// log.Printf("%d error sending epoch to %d: %v", from, to, err)
 }
 
 func (m *NewEpoch) Done(from int, to int) {
-	// log.Printf("%d sent epoch to %d", from, to)
+	slog.Debug("NewEpoch", "from", from, "to", to)
 }
 
 func (m *AckEpoch) Error(from int, to int, err error) {
@@ -21,7 +25,7 @@ func (m *AckEpoch) Error(from int, to int, err error) {
 }
 
 func (m *AckEpoch) Done(from int, to int) {
-	// log.Printf("%d sent epoch ack to %d", from, to)
+	slog.Debug("AckEpoch", "from", from, "to", to)
 }
 
 func (m *NewLeader) Error(from int, to int, err error) {
@@ -29,7 +33,7 @@ func (m *NewLeader) Error(from int, to int, err error) {
 }
 
 func (m *NewLeader) Done(from int, to int) {
-	// log.Printf("%d sent leader to %d", from, to)
+	slog.Debug("NewLeader", "from", from, "to", to)
 }
 
 func (m *AckLeader) Error(from int, to int, err error) {
@@ -38,14 +42,15 @@ func (m *AckLeader) Error(from int, to int, err error) {
 
 func (m *AckLeader) Done(from int, to int) {
 	// log.Printf("%d sent leader ack to %d", from, to)
+	slog.Debug("AckLeader", "from", from, "to", to)
 }
 
 func (m *FollowerInfo) Error(from int, to int, err error) {
-	log.Printf("%d error sending follower info to %d: %v", from, to, err)
+	slog.Error("FollowerInfo", "from", from, "to", to, "err", err)
 }
 
 func (m *FollowerInfo) Done(from int, to int) {
-	// log.Printf("%d sent follower info to %d", from, to)
+	slog.Debug("FollowerInfo", "from", from, "to", to)
 }
 
 func (m *Ping) Error(from int, to int, err error) {
@@ -53,7 +58,7 @@ func (m *Ping) Error(from int, to int, err error) {
 }
 
 func (m *Ping) Done(from int, to int) {
-	// log.Printf("%d received ping from %d", from, to)
+	slog.Debug("Ping", "from", from, "to", to)
 }
 
 func (m *ElectNotification) Error(from int, to int, err error) {
@@ -61,7 +66,7 @@ func (m *ElectNotification) Error(from int, to int, err error) {
 }
 
 func (m *ElectNotification) Done(from int, to int) {
-	// log.Printf("%d sent vote notif to %d", from, to)
+	slog.Debug("ElectNotification", "from", from, "to", to)
 }
 
 func (m *ElectResponse) Error(from int, to int, err error) {
@@ -69,7 +74,7 @@ func (m *ElectResponse) Error(from int, to int, err error) {
 }
 
 func (m *ElectResponse) Done(from int, to int) {
-	// log.Printf("%d sent vote response to %d", from, to)
+	slog.Debug("ElectResponse", "from", from, "to", to)
 }
 
 func (m *ZabRequest) Error(from int, to int, err error) {
@@ -85,7 +90,7 @@ func (m *ZabAck) Error(from int, to int, err error) {
 }
 
 func (m *ZabAck) Done(from int, to int) {
-	// log.Printf("%d sent zab ack to %d", from, to)
+	slog.Debug("ZabAck", "from", from, "to", to)
 }
 
 func (m *GetChildrenRequest) Error(from int, to int, err error) {
@@ -93,7 +98,7 @@ func (m *GetChildrenRequest) Error(from int, to int, err error) {
 }
 
 func (m *GetChildrenRequest) Done(from int, to int) {
-	// log.Printf("%d sent getChildren request to %d", from, to)
+	slog.Debug("GetChildrenRequest", "from", from, "to", to)
 }
 
 func (m *GetChildrenResponse) Error(from int, to int, err error) {
@@ -101,7 +106,7 @@ func (m *GetChildrenResponse) Error(from int, to int, err error) {
 }
 
 func (m *GetChildrenResponse) Done(from int, to int) {
-	// log.Printf("%d sent getChildren response to %d", from, to)
+	slog.Debug("GetChildrenResponse", "from", from, "to", to)
 }
 
 func (m *GetDataRequest) Error(from int, to int, err error) {
@@ -109,7 +114,7 @@ func (m *GetDataRequest) Error(from int, to int, err error) {
 }
 
 func (m *GetDataRequest) Done(from int, to int) {
-	// log.Printf("%d sent getData request to %d", from, to)
+	slog.Debug("GetDataRequest", "from", from, "to", to)
 }
 
 func (m *GetDataResponse) Error(from int, to int, err error) {
@@ -117,7 +122,7 @@ func (m *GetDataResponse) Error(from int, to int, err error) {
 }
 
 func (m *GetDataResponse) Done(from int, to int) {
-	// log.Printf("%d sent getData response to %d", from, to)
+	slog.Debug("GetDataResponse", "from", from, "to", to)
 }
 
 func (m *GetExistsRequest) Error(from int, to int, err error) {
@@ -125,7 +130,7 @@ func (m *GetExistsRequest) Error(from int, to int, err error) {
 }
 
 func (m *GetExistsRequest) Done(from int, to int) {
-	// log.Printf("%d sent getExists request to %d", from, to)
+	slog.Debug("GetExistsRequest", "from", from, "to", to)
 }
 
 func (m *GetExistsResponse) Error(from int, to int, err error) {
@@ -133,7 +138,7 @@ func (m *GetExistsResponse) Error(from int, to int, err error) {
 }
 
 func (m *GetExistsResponse) Done(from int, to int) {
-	// log.Printf("%d sent getExists response to %d", from, to)
+	slog.Debug("GetExistsResponse", "from", from, "to", to)
 }
 
 func (m *CUDRequest) Error(from int, to int, err error) {
@@ -141,7 +146,7 @@ func (m *CUDRequest) Error(from int, to int, err error) {
 }
 
 func (m *CUDRequest) Done(from int, to int) {
-	// log.Printf("%d sent getExists response to %d", from, to)
+	slog.Debug("CUDRequest", "from", from, "to", to)
 }
 
 func (m *CUDResponse) Error(from int, to int, err error) {
@@ -149,5 +154,5 @@ func (m *CUDResponse) Error(from int, to int, err error) {
 }
 
 func (m *CUDResponse) Done(from int, to int) {
-	// log.Printf("%d sent getExists response to %d", from, to)
+	slog.Debug("CUDResponse", "from", from, "to", to)
 }
