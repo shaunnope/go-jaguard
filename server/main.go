@@ -13,9 +13,9 @@ var (
 	configPath = flag.String("config", "config.json", "path to config file")
 	config     Config
 
-	idx = flag.Int("idx", 0, "server index")
+	// idx = flag.Int("idx", 0, "server index")
 
-	maxTimeout = flag.Int("maxTimeout", 100000, "max timeout for election")
+	maxTimeout = flag.Int("maxTimeout", 5000, "max timeout for election")
 
 	multiple_req = flag.Bool("multiple_req", false, "Set to true if flag is present")
 	multiple_cli = flag.Bool("multiple_cli", false, "Set to true if flag is present")

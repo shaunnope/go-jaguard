@@ -23,7 +23,6 @@ func NewNode(idx int) *Server {
 }
 
 func (s *Server) SendPing(ctx context.Context, in *pb.Ping) (*pb.Ping, error) {
-	// log.Printf("PING %d -> %d", in.Data, s.Id)
 	return &pb.Ping{Data: int64(s.Id)}, nil
 }
 
@@ -77,24 +76,19 @@ func (s *Server) EstablishConnection(to int, timeout int) (context.Context, cont
 // Use reference to grpc server to stop it
 func (s *Server) Serve(grpc_s *grpc.Server) {
 	time.Sleep(500 * time.Millisecond)
+
 	if *leader_verbo {
-		log.Printf("server %d begins fast leader election ", s.Id)
+		log.Printf("%d begin election ", s.Id)
 	}
-	vote := s.FastElection(*maxTimeout)
-	if *leader_verbo {
-		log.Printf("server %d vote for server %d whose zxid=%v ", s.Id, vote.Id, vote.LastZxid)
+	if vote := s.FastElection(*maxTimeout); vote.Id == -1 {
+		log.Fatalf("%d failed to elect leader", s.Id)
 	}
 
-	s.Setup(vote)
-	s.ElectBroadcast()
 	go s.Heartbeat()
 	time.Sleep(200 * time.Millisecond)
 
-	// s.Discovery()
-	// log.Printf("%d finished discovery", s.Id)
-
-	// var input string
-	// fmt.Scanln(&input)
+	s.Discovery()
+	log.Printf("%d finished discovery", s.Id)
 
 	<-s.Stop
 	grpc_s.GracefulStop()

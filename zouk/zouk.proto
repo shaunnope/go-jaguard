@@ -24,6 +24,7 @@ message Transaction {
     bytes data = 3;
     Flag flags = 4;
     OperationType type = 5;
+    bool isCommitted = 6;
 }
 
 message Ping {
@@ -72,6 +73,7 @@ message NewLeader {
 
 message AckLeader {
     int64 epoch = 1;
+    repeated Transaction history = 2;
 }
 
 // end zab
@@ -145,6 +147,7 @@ service Node {
     rpc InformLeader (FollowerInfo) returns (Ping);
     rpc ProposeEpoch (NewEpoch) returns (AckEpoch);
     rpc ProposeLeader (NewLeader) returns (AckLeader);
+    rpc Commit (Ping) returns (Ping);
 
     rpc SendZabRequest (ZabRequest) returns (ZabAck);
     

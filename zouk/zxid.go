@@ -2,6 +2,7 @@ package zouk
 
 import "fmt"
 
+// dataclass for zxid
 type ZxidFragment struct {
 	Epoch   int
 	Counter int
@@ -27,16 +28,18 @@ func (z ZxidFragment) Inc() ZxidFragment {
 	return ZxidFragment{Epoch: z.Epoch, Counter: z.Counter + 1}
 }
 
+// Convert to raw Zxid
 func (z ZxidFragment) Raw() *Zxid {
 	return &Zxid{Epoch: int64(z.Epoch), Counter: int64(z.Counter)}
 }
 
 type TransactionFragment struct {
-	Zxid  ZxidFragment
-	Path  string
-	Data  []byte
-	Flags *Flag
-	Type  OperationType
+	Zxid      ZxidFragment
+	Path      string
+	Data      []byte
+	Flags     *Flag
+	Type      OperationType
+	Committed bool
 }
 
 type TransactionFragments []TransactionFragment

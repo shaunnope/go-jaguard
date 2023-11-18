@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -44,8 +45,6 @@ func (s *Server) Heartbeat() {
 				log.Printf("%d lost quorum", s.Id)
 				s.FastElection(*maxTimeout)
 				return
-				// } else {
-				// 	log.Printf("%d has quorum", s.Id)
 			}
 
 		case FOLLOWING:
@@ -59,15 +58,13 @@ func (s *Server) Heartbeat() {
 			// Send heartbeat to leader
 			_, err := SendGrpc[*pb.Ping, *pb.Ping](pb.NodeClient.SendPing, s, s.Vote.Id, &pb.Ping{Data: int64(s.Id)}, *maxTimeout)
 			if err != nil {
-				log.Printf("%d lost leader", s.Id)
+				log.Printf("%d lost leader: %v", s.Id, s.Vote)
 				s.FastElection(*maxTimeout)
 				return
-				// } else {
-				// 	log.Printf("%d has leader", s.Id)
 			}
 
 		}
-
+		slog.Debug("Heartbeat", "s", s.Id, "state", s.State, "vote", s.Vote)
 		time.Sleep(time.Duration(*maxTimeout) * time.Millisecond)
 	}
 }

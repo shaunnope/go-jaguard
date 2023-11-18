@@ -29,7 +29,7 @@ func (s *Server) HandleClientCUD(ctx context.Context, in *pb.CUDRequest) (*pb.CU
 			RequestType: pb.RequestType_PROPOSAL,
 		}
 
-		s.Leader.FollowerEpochs = map[int]int{
+		s.Zab.FollowerEpochs = map[int]int{
 			0: 0,
 			1: 0,
 			2: 0,
@@ -37,7 +37,7 @@ func (s *Server) HandleClientCUD(ctx context.Context, in *pb.CUDRequest) (*pb.CU
 			4: 0,
 		}
 
-		majoritySize := len(s.Leader.FollowerEpochs)/2 + 1
+		majoritySize := len(s.Zab.FollowerEpochs)/2 + 1
 		log.Printf("server %d need %v to reach majority", s.Id, majoritySize)
 		done := make(chan bool, majoritySize)
 
@@ -48,7 +48,7 @@ func (s *Server) HandleClientCUD(ctx context.Context, in *pb.CUDRequest) (*pb.CU
 			Transaction: msg.Transaction,
 			RequestType: msg.RequestType,
 		}
-		for idx := range s.Leader.FollowerEpochs {
+		for idx := range s.Zab.FollowerEpochs {
 			if idx == s.Id {
 				continue
 			}
@@ -79,7 +79,7 @@ func (s *Server) HandleClientCUD(ctx context.Context, in *pb.CUDRequest) (*pb.CU
 		_, err := s.HandleOperation(transaction)
 
 		msg.RequestType = pb.RequestType_ANNOUNCEMENT
-		for idx := range s.Leader.FollowerEpochs {
+		for idx := range s.Zab.FollowerEpochs {
 			if idx == s.Id {
 				continue
 			}
