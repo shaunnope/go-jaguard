@@ -3,21 +3,30 @@ package main
 import (
 	"context"
 	"log"
+	"log/slog"
 
 	pb "github.com/shaunnope/go-jaguard/zouk"
 )
 
 func (s *Server) HandleClientCUD(ctx context.Context, in *pb.CUDRequest) (*pb.CUDResponse, error) {
-	isLeader := s.GetState() == LEADING
-
+	// if follower, forward to leader, do nothing with response (rpc)
 	// if leader send proposal to all followers in for loop (rpc)
 	// since its rpc, leader will monitor for responses and decide whether to commit/announce
-	// if follower forward to leader, do nothing with response (rpc)
-	if isLeader {
+	switch state := s.GetState(); state {
+	case FOLLOWING:
+		slog.Debug("Client Forward", "s", s.Id, "to", s.Vote.Id, "request", in)
+		// TODO: verify version
+		// forward to leader
+		r, err := SendGrpc[*pb.CUDRequest, *pb.CUDResponse](pb.NodeClient.HandleClientCUD, s, s.Vote.Id, in, *maxTimeout)
+
+		return r, err
+	case LEADING:
+
 		log.Printf("server %d received client request: %v", s.Id, in)
 		// TODO: verify version
 		// propose to all
 		s.Lock()
+		defer s.Unlock()
 		msg := &pb.ZabRequest{
 			Transaction: &pb.Transaction{
 				Zxid:  s.LastZxid.Inc().Raw(),
@@ -29,19 +38,9 @@ func (s *Server) HandleClientCUD(ctx context.Context, in *pb.CUDRequest) (*pb.CU
 			RequestType: pb.RequestType_PROPOSAL,
 		}
 
-		s.Zab.FollowerEpochs = map[int]int{
-			0: 0,
-			1: 0,
-			2: 0,
-			3: 0,
-			4: 0,
-		}
-
 		majoritySize := len(s.Zab.FollowerEpochs)/2 + 1
-		log.Printf("server %d need %v to reach majority", s.Id, majoritySize)
+		slog.Info("Client Propose", "s", s.Id, "majority", majoritySize, "request", msg)
 		done := make(chan bool, majoritySize)
-
-		successfulSends := 0
 
 		log.Printf("server %d prepare to send message: %s", s.Id, msg.Transaction.ExtractLogString())
 		copiedMsg := &pb.ZabRequest{
@@ -53,50 +52,34 @@ func (s *Server) HandleClientCUD(ctx context.Context, in *pb.CUDRequest) (*pb.CU
 				continue
 			}
 			go func(i int) {
-				_, err := SendGrpc[*pb.ZabRequest, *pb.ZabAck](pb.NodeClient.SendZabRequest, s, i, copiedMsg, *maxTimeout)
-				if err == nil {
-					// NOTE: might have race condition on successfulSends
-					successfulSends++
-					// log.Printf("server %d gotten %d acknowledgement", s.Id, successfulSends)
-					if successfulSends <= majoritySize {
-						done <- true
-					}
+				if r, err := SendGrpc[*pb.ZabRequest, *pb.ZabAck](pb.NodeClient.SendZabRequest, s, i, copiedMsg, *maxTimeout); err == nil && r.Accept {
+					done <- true
 				}
 			}(idx)
 		}
 		// wait for quorum
-		for len(done) < majoritySize {
+		for i := 0; i < majoritySize; i++ {
+			<-done
 		}
-		log.Printf("server %d get quoram", s.Id)
-
-		// commit
-		s.History = append(s.History, msg.Transaction.ExtractLog())
-		s.LastZxid = msg.Transaction.Extract().Zxid
-
-		// @Shi Hui: Leader commit change on local copy
-		// LEADER need to execute request
-		transaction := msg.Transaction.Extract()
-		_, err := s.HandleOperation(transaction)
+		log.Printf("server %d get quorum", s.Id)
 
 		msg.RequestType = pb.RequestType_ANNOUNCEMENT
 		for idx := range s.Zab.FollowerEpochs {
 			if idx == s.Id {
 				continue
 			}
-
-			log.Printf("server %d sending ANNOUNCEMENT TO server %d with message %v", s.Id, idx, msg)
+			slog.Info("HandleClientCUD", "s", s.Id, "to", idx, "type", msg.RequestType, "txn", msg.Transaction.Extract())
 			SendGrpc[*pb.ZabRequest, *pb.ZabAck](pb.NodeClient.SendZabRequest, s, idx, msg, *maxTimeout)
 		}
-		defer s.Unlock()
-		accepted := true
-		return &pb.CUDResponse{Accept: &accepted}, err
-	} else {
-		log.Printf("server %d forwarding request to %d", s.Id, s.Vote.Id)
-		// todo verify version
-		// forward to leader
-		r, err := SendGrpc[*pb.CUDRequest, *pb.CUDResponse](pb.NodeClient.HandleClientCUD, s, s.Vote.Id, in, *maxTimeout)
 
-		return r, err
+		accepted := true
+		// commit
+		err := s.ZabDeliver(msg.Transaction.Extract())
+		return &pb.CUDResponse{Accept: &accepted}, err
+	default:
+		log.Printf("server %d is in %s state", s.Id, state)
+		accepted := false
+		return &pb.CUDResponse{Accept: &accepted}, nil
 	}
 
 }

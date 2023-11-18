@@ -24,7 +24,6 @@ message Transaction {
     bytes data = 3;
     Flag flags = 4;
     OperationType type = 5;
-    bool isCommitted = 6;
 }
 
 message Ping {
@@ -87,6 +86,7 @@ message ZabRequest {
 
 message ZabAck {
     ZabRequest request = 1;
+    bool accept = 2;
 }
 
 enum RequestType{
@@ -147,7 +147,7 @@ service Node {
     rpc InformLeader (FollowerInfo) returns (Ping);
     rpc ProposeEpoch (NewEpoch) returns (AckEpoch);
     rpc ProposeLeader (NewLeader) returns (AckLeader);
-    rpc Commit (Ping) returns (Ping);
+    rpc Commit (ZabRequest) returns (Ping);
 
     rpc SendZabRequest (ZabRequest) returns (ZabAck);
     

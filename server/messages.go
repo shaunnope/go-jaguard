@@ -2,10 +2,36 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"log"
+	"time"
 
 	pb "github.com/shaunnope/go-jaguard/zouk"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
+
+type ContextKey string
+
+// Establish connection to another server if it does not already exist. Returns a context and cancel function
+func (s *Server) EstablishConnection(to int, timeout int) (context.Context, context.CancelFunc) {
+	if to == s.Id {
+		return nil, nil
+	}
+	if _, ok := s.Connections[to]; !ok {
+		addr := fmt.Sprintf("%s:%d", config.Servers[to].Host, config.Servers[to].Port)
+		conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if err != nil {
+			log.Fatalf("%d failed to connect to %d: %v", s.Id, to, err)
+		}
+		c := pb.NewNodeClient(conn)
+		s.Connections[to] = &c
+	}
+	ctx := context.WithValue(context.Background(), ContextKey("from"), s.Id)
+
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(timeout)*time.Millisecond)
+	return ctx, cancel
+}
 
 // Perform a gRPC call to another server
 //

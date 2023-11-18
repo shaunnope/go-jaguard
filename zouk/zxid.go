@@ -42,6 +42,10 @@ type TransactionFragment struct {
 	Committed bool
 }
 
+func (t TransactionFragment) String() string {
+	return fmt.Sprintf("{%d %d} %s @ %s %v", t.Zxid.Epoch, t.Zxid.Counter, t.Type, t.Path, t.Data)
+}
+
 type TransactionFragments []TransactionFragment
 
 func (ts TransactionFragments) Raw() []*Transaction {
@@ -77,7 +81,7 @@ func (t *Transaction) ExtractLog() TransactionFragment {
 }
 
 func (t *Transaction) ExtractLogString() string {
-	return fmt.Sprintf("Zxid: %v, REQUEST %s @ PATH: %s", t.Zxid.Extract(), t.Type, t.Path)
+	return fmt.Sprintf("Zxid: %v %s @ PATH: %s", t.Zxid.Extract(), t.Type, t.Path)
 }
 
 func (t *Transaction) WithZxid(z ZxidFragment) *Transaction {

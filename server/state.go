@@ -99,7 +99,6 @@ func NewStateVector(idx int) StateVector {
 		Zab:         NewZabSession(),
 		Data:        pb.NewDataTree(),
 		Stop:        make(chan bool),
-		// LastZxid:    pb.ZxidFragment{Epoch: 1, Counter: 0},
 		Vote: pb.VoteFragment{
 			LastZxid: pb.ZxidFragment{
 				Epoch:   0,
