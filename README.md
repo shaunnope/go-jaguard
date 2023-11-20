@@ -10,6 +10,19 @@ A Go implementation of [Apache Zookeper](https://zookeeper.apache.org/) Protocol
 - Zookeeper Client (CLI)
 - Zookeeper Server Cluster
 
+## Table of Contents
+- [Jaguard](#jaguard)
+  - [Table of Contents](#table-of-contents)
+  - [Features](#features)
+  - [Guarantees](#guarantees)
+  - [Getting Started](#getting-started)
+    - [Pre-requsites](#pre-requsites)
+    - [Build](#build)
+    - [Run](#run)
+  - [Design](#design)
+  - [Testing](#testing)
+  - [Acknowledgement](#acknowledgement)
+
 ## Features
 - Znode implementation 
 - Znode read/write operations + replication across different servers for maintenance of data tree 
@@ -40,21 +53,18 @@ Then, run `make cli` to start the client and `make puppet` to start the Zookeper
 Read about the project structure, design considerations and issues in [DESIGN.md](DESIGN.md).
 
 ## Testing
-- how to run
-
-To run the servers for testing, you need to change the directory to `/server` and you can run with the following commands.
+To run the servers for testing, execute the following command.
 
 ```shell
-go run *.go -config=../config.json
+go run ./server -config=config.json
 ```
-
-It has a few flags for the Checkpoint 2 demonstration.
+A few flags are defined for the demonstration in Checkpoint 2.
 
 - `-multiple_req` : For multiple request through the same server
 - `-multiple_cli` : For multiple request through different servers
 - `-leader_verbo` : For more detail printing for leader election
 
-The code progress as such
+The code progresses as such
 
 It start from `main.go`
 - Parse the flag

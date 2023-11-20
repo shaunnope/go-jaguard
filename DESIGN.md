@@ -1,16 +1,24 @@
 # Design
 
-## Structure
+- [Design](#design)
+- [Structure](#structure)
+- [Implementation](#implementation)
+  - [Data Tree](#data-tree)
+  - [ZooKeeper Atomic Broadcast (ZAB)](#zookeeper-atomic-broadcast-zab)
+- [Issues](#issues)
+- [References](#references)
+
+# Structure
 ```
 # top level directory
 ├── build.sh
-├── client
+├── client/
 ├── config.json
 ├── main.go
-├── server
-└── zouk
+├── server/
+└── zouk/
 ```
-Jaguard has 3 main directories. Loosely speaking, `client` and `server` deal with networking and read/write operations, while `zouk` deals with znodes, zookeeper protocol implementation and grpc interfaces.
+Jaguard comprises of 3 main directories. Loosely speaking, `client` and `server` deal with networking and read/write operations, while the `zouk` module defines all the types and interfaces for the ZooKeeper protocol such as znodes, zxids and the data tree. The grpc interfaces are defined in `zouk/zouk.proto`.
 
 <details open><summary>Client</summary>
 
@@ -53,13 +61,22 @@ Jaguard has 3 main directories. Loosely speaking, `client` and `server` deal wit
 ```
 </details>
 
-## Implementation
-
+# Implementation
+## Data Tree
 datatree is implemented as a hashmap, to optimise read operations to the leaves of the tree.
 
 ```
 key       : value
 tree path : pointer to node
 ```
+## ZooKeeper Atomic Broadcast (ZAB)
+ZAB is implemented as a 2-phase commit protocol. The leader sends a proposal to all followers, and waits for a quorum of ACKs before committing the proposal. The leader then sends a commit message to all followers, and waits for a quorum of ACKs before sending a commit message to the client. Our implementation is in `server/zab.go` and is adapted from the description of the protocol in the paper by [Medeiros](https://api.semanticscholar.org/CorpusID:14507005).
 
-## Issues
+We also implemented the Fast Leader Election protocol described in the paper. The leader election protocol is implemented in `server/election.go`.
+
+
+# Issues
+
+
+# References
+- Medeiros, A. (2012). ZooKeeper’s atomic broadcast protocol: Theory and practice.
