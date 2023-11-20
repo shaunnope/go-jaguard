@@ -2,9 +2,12 @@ package main
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/shaunnope/go-jaguard/zouk"
 	pb "github.com/shaunnope/go-jaguard/zouk"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 // Perform a gRPC call to another server
@@ -34,5 +37,17 @@ func SendGrpc[T pb.Message, R pb.Message](
 	}
 	msg.Done(s.Id, to)
 	return r, nil
+}
 
+func TriggerWatch(watch *zouk.Watch, operationType pb.OperationType) {
+	fmt.Printf("Sending watch gRPC call\n")
+	callbackAddr := fmt.Sprintf("%s:%s", watch.ClientAddr.Host, watch.ClientAddr.Port)
+	conn, err := grpc.Dial(callbackAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+
+	if err != nil {
+		fmt.Println("Couldnt connect to zkclient")
+	}
+	defer conn.Close()
+	client := pb.NewZkCallbackClient(conn)
+	client.NotifyWatchTrigger(context.Background(), &pb.WatchNotification{Path: watch.Path, OperationType: operationType})
 }

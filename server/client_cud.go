@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 
 	pb "github.com/shaunnope/go-jaguard/zouk"
@@ -78,7 +79,24 @@ func (s *Server) HandleClientCUDS(ctx context.Context, in *pb.CUDSRequest) (*pb.
 		transaction := msg.Transaction.Extract()
 		var err error
 		if in.OperationType != pb.OperationType_SYNC {
+			if in.OperationType == pb.OperationType_DELETE || in.OperationType == pb.OperationType_UPDATE {
+				transactionFrag := msg.Transaction.ExtractLog()
+				watchesTriggered := s.Data.CheckWatchTrigger(&transactionFrag)
+				for i := 0; i < len(watchesTriggered); i++ {
+					TriggerWatch(watchesTriggered[i], in.OperationType)
+				}
+			}
+			if transaction.Type == pb.OperationType_UPDATE {
+				fmt.Printf("Transaction's Data update with %s", transaction.Data)
+			}
 			_, err = s.HandleOperation(transaction)
+			if in.OperationType == pb.OperationType_WRITE {
+				transactionFrag := msg.Transaction.ExtractLog()
+				watchesTriggered := s.Data.CheckWatchTrigger(&transactionFrag)
+				for i := 0; i < len(watchesTriggered); i++ {
+					TriggerWatch(watchesTriggered[i], in.OperationType)
+				}
+			}
 		}
 
 		msg.RequestType = pb.RequestType_ANNOUNCEMENT

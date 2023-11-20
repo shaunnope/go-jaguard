@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -21,6 +22,10 @@ var (
 	port       = flag.Int("port", 50057, "server port")
 	addr       = flag.String("addr", "localhost:50051", "the address to connect to")
 	maxTimeout = flag.Int("maxTimeout", 100000, "max timeout for election")
+)
+
+const (
+	host = "localhost"
 )
 
 func listHelp() {
@@ -58,7 +63,6 @@ func parseReadCommand(command []string) (string, bool, error) {
 			}
 		}
 	}
-
 	return path, setWatch, nil
 }
 
@@ -82,7 +86,7 @@ Loop:
 				break
 			}
 
-			getChildrenReply, err := SendClientGrpc[*pb.GetChildrenRequest, *pb.GetChildrenResponse](pb.NodeClient.GetChildren, &pb.GetChildrenRequest{Path: path, SetWatch: setWatch}, *maxTimeout)
+			getChildrenReply, err := SendClientGrpc[*pb.GetChildrenRequest, *pb.GetChildrenResponse](pb.NodeClient.GetChildren, &pb.GetChildrenRequest{Path: path, SetWatch: setWatch, ClientHost: host, ClientPort: strconv.Itoa(*port)}, *maxTimeout)
 
 			fmt.Printf("READ: %s has children: %s\n", path, getChildrenReply.Children)
 			if err != nil {
@@ -98,7 +102,7 @@ Loop:
 				break
 			}
 
-			getData, err := SendClientGrpc[*pb.GetDataRequest, *pb.GetDataResponse](pb.NodeClient.GetData, &pb.GetDataRequest{Path: path, SetWatch: setWatch}, *maxTimeout)
+			getData, err := SendClientGrpc[*pb.GetDataRequest, *pb.GetDataResponse](pb.NodeClient.GetData, &pb.GetDataRequest{Path: path, SetWatch: setWatch, ClientHost: host, ClientPort: strconv.Itoa(*port)}, *maxTimeout)
 
 			fmt.Printf("READ: %s has data:%b\n", path, getData.Data)
 			if err != nil {
@@ -114,7 +118,7 @@ Loop:
 				break
 			}
 
-			getExists, err := SendClientGrpc[*pb.GetExistsRequest, *pb.GetExistsResponse](pb.NodeClient.GetExists, &pb.GetExistsRequest{Path: path, SetWatch: setWatch}, *maxTimeout)
+			getExists, err := SendClientGrpc[*pb.GetExistsRequest, *pb.GetExistsResponse](pb.NodeClient.GetExists, &pb.GetExistsRequest{Path: path, SetWatch: setWatch, ClientHost: host, ClientPort: strconv.Itoa(*port)}, *maxTimeout)
 
 			if err != nil {
 				log.Printf("Error sending read request: %s\n", err)

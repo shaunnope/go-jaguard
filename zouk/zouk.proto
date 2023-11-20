@@ -97,7 +97,8 @@ enum RequestType{
 message GetDataRequest {
     string path = 1;
     bool setWatch = 2;
-    // @waishun, might need to add client IP and port
+    string clientHost = 3;
+    string clientPort = 4;
 }
 
 message GetDataResponse {
@@ -108,8 +109,8 @@ message GetDataResponse {
 message GetChildrenRequest {
     string path = 1;
     bool setWatch = 2;
-    // @waishun, might need to add client IP and port
-}
+    string clientHost = 3;
+    string clientPort = 4;}
 
 message GetChildrenResponse {
     repeated string children = 1;
@@ -119,8 +120,8 @@ message GetChildrenResponse {
 message GetExistsRequest {
     string path = 1;
     bool setWatch = 2;
-    // @waishun, might need to add client IP and port
-}
+    string clientHost = 3;
+    string clientPort = 4;}
 
 message GetExistsResponse {
     bool exists = 1;

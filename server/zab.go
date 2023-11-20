@@ -164,7 +164,21 @@ func (s *Server) SendZabRequest(ctx context.Context, in *pb.ZabRequest) (*pb.Zab
 		log.Printf("server %d update local copy", s.Id)
 		var err error
 		if transaction.Type != pb.OperationType_SYNC {
+			if transaction.Type == pb.OperationType_DELETE || transaction.Type == pb.OperationType_UPDATE {
+				transactionFrag := in.Transaction.ExtractLog()
+				watchesTriggered := s.Data.CheckWatchTrigger(&transactionFrag)
+				for i := 0; i < len(watchesTriggered); i++ {
+					TriggerWatch(watchesTriggered[i], transaction.Type)
+				}
+			}
 			_, err = s.HandleOperation(transaction)
+			if transaction.Type == pb.OperationType_WRITE {
+				transactionFrag := in.Transaction.ExtractLog()
+				watchesTriggered := s.Data.CheckWatchTrigger(&transactionFrag)
+				for i := 0; i < len(watchesTriggered); i++ {
+					TriggerWatch(watchesTriggered[i], transaction.Type)
+				}
+			}
 		}
 		return &pb.ZabAck{Request: in}, err
 	}
