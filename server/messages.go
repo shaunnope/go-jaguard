@@ -60,5 +60,17 @@ func SendGrpc[T pb.Message, R pb.Message](
 	}
 	msg.Done(s.Id, to)
 	return r, nil
+}
 
+func TriggerWatch(watch *pb.Watch, operationType pb.OperationType) {
+	fmt.Printf("Sending watch gRPC call\n")
+	callbackAddr := fmt.Sprintf("%s:%s", watch.ClientAddr.Host, watch.ClientAddr.Port)
+	conn, err := grpc.Dial(callbackAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+
+	if err != nil {
+		fmt.Println("Couldnt connect to zkclient")
+	}
+	defer conn.Close()
+	client := pb.NewZkCallbackClient(conn)
+	client.NotifyWatchTrigger(context.Background(), &pb.WatchNotification{Path: watch.Path, OperationType: operationType})
 }

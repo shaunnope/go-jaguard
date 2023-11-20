@@ -137,11 +137,12 @@ func (znode *Znode) SetData(data []byte) {
 // Add Watch to the Znode + check if watch already exists
 func (znode *Znode) AddWatch(watch *Watch) (string, error) {
 	for _, clientWatch := range znode.Watches {
-		if clientWatch.ClientId == watch.ClientId && clientWatch.Type == watch.Type {
+		if clientWatch.ClientAddr == watch.ClientAddr && clientWatch.Type == watch.Type {
 			return "", errors.New("watch already exists")
 		}
 	}
 	znode.Watches = append(znode.Watches, watch)
+	// fmt.Printf("Znode %s added watch: %s to its watches \n", znode, watch.PrintWatch())
 	return "ok", nil
 }
 

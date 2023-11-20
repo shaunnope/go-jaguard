@@ -191,14 +191,30 @@ func (s *Server) SendZabRequest(ctx context.Context, in *pb.ZabRequest) (*pb.Zab
 	case pb.RequestType_ANNOUNCEMENT:
 		// TODO: for each commit (announcement), wait until all earlier proposals are committed
 		// then, commit
-
-		// @Shi Hui: Follower commit change on local copy
-		// LEADER need to execute request
 		transaction := in.Transaction.Extract()
 		s.Lock()
 		defer s.Unlock()
-
-		return &pb.ZabAck{Request: in}, s.ZabDeliver(transaction)
+		log.Printf("server %d update local copy", s.Id)
+		var err error
+		if transaction.Type != pb.OperationType_SYNC {
+			if transaction.Type == pb.OperationType_DELETE || transaction.Type == pb.OperationType_UPDATE {
+				transactionFrag := in.Transaction.ExtractLog()
+				watchesTriggered := s.Data.CheckWatchTrigger(&transactionFrag)
+				for i := 0; i < len(watchesTriggered); i++ {
+					TriggerWatch(watchesTriggered[i], transaction.Type)
+				}
+			}
+			_, err = s.HandleOperation(transaction)
+			if transaction.Type == pb.OperationType_WRITE {
+				transactionFrag := in.Transaction.ExtractLog()
+				watchesTriggered := s.Data.CheckWatchTrigger(&transactionFrag)
+				for i := 0; i < len(watchesTriggered); i++ {
+					TriggerWatch(watchesTriggered[i], transaction.Type)
+				}
+			}
+		}
+		return &pb.ZabAck{Request: in}, err
+		// return &pb.ZabAck{Request: in}, s.ZabDeliver(transaction)
 	}
 
 	return nil, errors.New("zab request not accepted")

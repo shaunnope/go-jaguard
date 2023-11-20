@@ -20,6 +20,7 @@ var (
 	multiple_req = flag.Bool("multiple_req", false, "Set to true if flag is present")
 	multiple_cli = flag.Bool("multiple_cli", false, "Set to true if flag is present")
 	leader_verbo = flag.Bool("leader_verbo", false, "Set to true if flag is present")
+	call_watch   = flag.Bool("call_watch", false, "Set to true if flag is present")
 )
 
 func parseConfig(path string) {

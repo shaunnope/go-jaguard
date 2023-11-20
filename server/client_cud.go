@@ -2,13 +2,14 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"log/slog"
 
 	pb "github.com/shaunnope/go-jaguard/zouk"
 )
 
-func (s *Server) HandleClientCUD(ctx context.Context, in *pb.CUDRequest) (*pb.CUDResponse, error) {
+func (s *Server) HandleClientCUDS(ctx context.Context, in *pb.CUDSRequest) (*pb.CUDSResponse, error) {
 	// if follower, forward to leader, do nothing with response (rpc)
 	// if leader send proposal to all followers in for loop (rpc)
 	// since its rpc, leader will monitor for responses and decide whether to commit/announce
@@ -17,7 +18,7 @@ func (s *Server) HandleClientCUD(ctx context.Context, in *pb.CUDRequest) (*pb.CU
 		slog.Debug("Client Forward", "s", s.Id, "to", s.Vote.Id, "request", in)
 		// TODO: verify version
 		// forward to leader
-		r, err := SendGrpc[*pb.CUDRequest, *pb.CUDResponse](pb.NodeClient.HandleClientCUD, s, s.Vote.Id, in, *maxTimeout)
+		r, err := SendGrpc[*pb.CUDSRequest, *pb.CUDSResponse](pb.NodeClient.HandleClientCUDS, s, s.Vote.Id, in, *maxTimeout)
 
 		return r, err
 	case LEADING:
@@ -63,6 +64,29 @@ func (s *Server) HandleClientCUD(ctx context.Context, in *pb.CUDRequest) (*pb.CU
 		}
 		log.Printf("server %d get quorum", s.Id)
 
+		transaction := msg.Transaction.Extract()
+		var err error
+		if in.OperationType != pb.OperationType_SYNC {
+			if in.OperationType == pb.OperationType_DELETE || in.OperationType == pb.OperationType_UPDATE {
+				transactionFrag := msg.Transaction.ExtractLog()
+				watchesTriggered := s.Data.CheckWatchTrigger(&transactionFrag)
+				for i := 0; i < len(watchesTriggered); i++ {
+					TriggerWatch(watchesTriggered[i], in.OperationType)
+				}
+			}
+			if transaction.Type == pb.OperationType_UPDATE {
+				fmt.Printf("Transaction's Data update with %s", transaction.Data)
+			}
+			err = s.ZabDeliver(msg.Transaction.Extract())
+			if in.OperationType == pb.OperationType_WRITE {
+				transactionFrag := msg.Transaction.ExtractLog()
+				watchesTriggered := s.Data.CheckWatchTrigger(&transactionFrag)
+				for i := 0; i < len(watchesTriggered); i++ {
+					TriggerWatch(watchesTriggered[i], in.OperationType)
+				}
+			}
+		}
+
 		msg.RequestType = pb.RequestType_ANNOUNCEMENT
 		for idx := range s.Zab.FollowerEpochs {
 			if idx == s.Id {
@@ -74,12 +98,11 @@ func (s *Server) HandleClientCUD(ctx context.Context, in *pb.CUDRequest) (*pb.CU
 
 		accepted := true
 		// commit
-		err := s.ZabDeliver(msg.Transaction.Extract())
-		return &pb.CUDResponse{Accept: &accepted}, err
+		return &pb.CUDSResponse{Accept: &accepted}, err
 	default:
 		log.Printf("server %d is in %s state", s.Id, state)
 		accepted := false
-		return &pb.CUDResponse{Accept: &accepted}, nil
+		return &pb.CUDSResponse{Accept: &accepted}, nil
 	}
 
 }

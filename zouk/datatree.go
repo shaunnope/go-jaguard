@@ -26,6 +26,7 @@ func NewDataTree() *DataTree {
 		Data:     []byte{},
 		Eph:      false,
 		Id:       PATH_SEP,
+		Watches:  []*Watch{},
 	}
 
 	dataTree := DataTree{
@@ -160,53 +161,66 @@ func (dataTree *DataTree) AddWatchToNode(path string, watch *Watch) (string, err
 	}
 
 	nodeAddWatch.AddWatch(watch)
+	fmt.Printf("Watch %s added\n", watch.PrintWatch())
 	return "ok", nil
 }
 
-func (dataTree *DataTree) CheckWatchTrigger(event *Event) {
-	// based on the path of the event, the client, check the parent, check what kind of event it is - like create or delete etc
-	// remove the watch
-	lastSlashIndex := strings.LastIndex(event.Path, PATH_SEP)
-	parentName := getParentName(event.Path, lastSlashIndex)
-	nodeName := event.Path[lastSlashIndex:]
-	fmt.Printf("Checking triggers with parentName:%s, nodeName:%s for zxid:%d\n", parentName, nodeName, event.Zxid)
+func (dataTree *DataTree) CheckWatchTrigger(transactionFragment *TransactionFragment) []*Watch {
+	// Extract parentName and nodeName from the path
+	lastSlashIndex := strings.LastIndex(transactionFragment.Path, PATH_SEP)
+	parentName := getParentName(transactionFragment.Path, lastSlashIndex)
+	nodeName := transactionFragment.Path[lastSlashIndex:]
 
+	// Print debug information
+	fmt.Printf("Checking triggers with parentName:%s, nodeName:%s for transaction:%s\n", parentName, nodeName, transactionFragment)
+
+	// Get parent and current nodes from the data tree
 	parentNode, _ := dataTree.GetNode(parentName)
-	node, _ := dataTree.GetNode(event.Path)
+	node, _ := dataTree.GetNode(transactionFragment.Path)
 
 	// Function to remove triggered watches
-	removeTriggeredWatches := func(watches []*Watch, watchType WatchType) []*Watch {
+	removeTriggeredWatches := func(watches []*Watch, watchType WatchType) ([]*Watch, []*Watch) {
 		var remainingWatches []*Watch
+		var triggeredWatches []*Watch
+
+		// Iterate over watches and filter triggered and remaining watches
 		for _, watch := range watches {
 			if watch.Type == watchType {
 				fmt.Printf("Triggered: %s\n", watch.PrintWatch())
+				triggeredWatches = append(triggeredWatches, watch)
 			} else {
 				remainingWatches = append(remainingWatches, watch)
 			}
 		}
-		return remainingWatches
+		return remainingWatches, triggeredWatches
 	}
 
-	switch event.Type {
-	case Create:
+	var remainingWatches []*Watch
+	var triggeredWatches []*Watch
+	var triggered []*Watch
+
+	switch transactionFragment.Type {
+	case OperationType_WRITE, OperationType_DELETE, OperationType_UPDATE:
+		// For DELETE and UPDATE, also check GetData watch
+		if transactionFragment.Type != OperationType_WRITE {
+			remainingWatches, triggered = removeTriggeredWatches(node.GetWatches(), GetData)
+			node.SetWatches(remainingWatches)
+			triggeredWatches = append(triggeredWatches, triggered...)
+		}
+
 		// Check for current node
-		node.SetWatches(removeTriggeredWatches(node.GetWatches(), Exists))
+		remainingWatches, triggered = removeTriggeredWatches(node.GetWatches(), Exists)
+		node.SetWatches(remainingWatches)
+		triggeredWatches = append(triggeredWatches, triggered...)
+
 		// Check for parent node
-		parentNode.SetWatches(removeTriggeredWatches(parentNode.GetWatches(), GetChildren))
-	case Delete:
-		// Check for current node
-		node.SetWatches(removeTriggeredWatches(node.GetWatches(), Exists))
-		node.SetWatches(removeTriggeredWatches(node.GetWatches(), GetData))
-		// Check for parent node
-		parentNode.SetWatches(removeTriggeredWatches(parentNode.GetWatches(), GetChildren))
-	case Change:
-		// Check for current node
-		node.SetWatches(removeTriggeredWatches(node.GetWatches(), Exists))
-		node.SetWatches(removeTriggeredWatches(node.GetWatches(), GetData))
-	case Child:
-		parentNode.SetWatches(removeTriggeredWatches(parentNode.GetWatches(), GetChildren))
+		remainingWatches, triggered = removeTriggeredWatches(parentNode.GetWatches(), GetChildren)
+		parentNode.SetWatches(remainingWatches)
+		triggeredWatches = append(triggeredWatches, triggered...)
 	}
-	fmt.Println("Done checking watches")
+
+	// Print debug information
+	return triggeredWatches
 }
 
 // .

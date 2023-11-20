@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"log/slog"
 	"net"
 	"time"
 
 	pb "github.com/shaunnope/go-jaguard/zouk"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 type Server struct {
@@ -25,24 +27,46 @@ func (s *Server) SendPing(ctx context.Context, in *pb.Ping) (*pb.Ping, error) {
 	return &pb.Ping{Data: int64(s.Id)}, nil
 }
 
-// TODO: SetWatch
-
 func (s *Server) GetExists(ctx context.Context, in *pb.GetExistsRequest) (*pb.GetExistsResponse, error) {
 	node, err := s.StateVector.Data.GetNode(in.Path)
 	if node == nil {
 		return &pb.GetExistsResponse{Exists: false, Zxid: s.LastZxid.Inc().Raw()}, err
 	}
+	if in.SetWatch {
+		s.StateVector.Data.AddWatchToNode(in.Path, &pb.Watch{
+			Path:       in.Path,
+			Type:       pb.Exists,
+			ClientAddr: pb.Addr{Host: in.ClientHost, Port: in.ClientPort},
+		})
+	}
+
 	return &pb.GetExistsResponse{Exists: true, Zxid: s.LastZxid.Inc().Raw()}, err
 }
 
 func (s *Server) GetData(ctx context.Context, in *pb.GetDataRequest) (*pb.GetDataResponse, error) {
 	data, err := s.StateVector.Data.GetData(in.Path)
+	if in.SetWatch {
+		s.StateVector.Data.AddWatchToNode(in.Path, &pb.Watch{
+			Path:       in.Path,
+			Type:       pb.GetData,
+			ClientAddr: pb.Addr{Host: in.ClientHost, Port: in.ClientPort},
+		})
+	}
 
 	return &pb.GetDataResponse{Data: data, Zxid: s.LastZxid.Inc().Raw()}, err
 }
 
 func (s *Server) GetChildren(ctx context.Context, in *pb.GetChildrenRequest) (*pb.GetChildrenResponse, error) {
 	children, err := s.StateVector.Data.GetNodeChildren(in.Path)
+
+	fmt.Printf("Host:%s, Port:%s\n", in.ClientHost, in.ClientPort)
+	if in.SetWatch {
+		s.StateVector.Data.AddWatchToNode(in.Path, &pb.Watch{
+			Path:       in.Path,
+			Type:       pb.GetChildren,
+			ClientAddr: pb.Addr{Host: in.ClientHost, Port: in.ClientPort},
+		})
+	}
 	//Type conversion
 	out := make([]string, 0)
 	for key := range children {
@@ -104,6 +128,18 @@ func Run(idx int) {
 	if idx == 3 && *multiple_cli {
 		log.Printf("server %d received request from client", idx)
 		go Simulate(node, "/cli3-1")
+	}
+
+	if *call_watch {
+		fmt.Printf("Test watch\n")
+		callbackAddr := fmt.Sprintf("%s:%d", "localhost", 50057)
+		conn, err := grpc.Dial(callbackAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if err != nil {
+			slog.Error("Couldn't connect to zkclient", "err", err)
+		}
+		defer conn.Close()
+		client := pb.NewZkCallbackClient(conn)
+		client.NotifyWatchTrigger(context.Background(), &pb.WatchNotification{Path: "/test", OperationType: pb.OperationType_DELETE})
 	}
 
 	// start grpc service (blocking)

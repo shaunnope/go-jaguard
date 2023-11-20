@@ -6,7 +6,9 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,9 +19,13 @@ import (
 
 var (
 	// flags
-	port       = flag.Int("port", 50051, "server port")
+	port       = flag.Int("port", 50057, "server port")
 	addr       = flag.String("addr", "localhost:50051", "the address to connect to")
 	maxTimeout = flag.Int("maxTimeout", 100000, "max timeout for election")
+)
+
+const (
+	host = "localhost"
 )
 
 func listHelp() {
@@ -32,6 +38,7 @@ func listHelp() {
 	fmt.Println("	create path [data]") //create node in path (acl not implemented)
 	fmt.Println("	delete path")        //delete node in path (-v version flag not implemented)
 	fmt.Println("	set path data")      //set data of node in path (-v version flag not implemented)
+	fmt.Println("	sync")               //set data of node in path (-v version flag not implemented)
 
 	fmt.Println("	q")
 	fmt.Println("----------------------")
@@ -56,7 +63,6 @@ func parseReadCommand(command []string) (string, bool, error) {
 			}
 		}
 	}
-
 	return path, setWatch, nil
 }
 
@@ -80,7 +86,7 @@ Loop:
 				break
 			}
 
-			getChildrenReply, err := SendClientGrpc[*pb.GetChildrenRequest, *pb.GetChildrenResponse](pb.NodeClient.GetChildren, &pb.GetChildrenRequest{Path: path, SetWatch: setWatch}, *maxTimeout)
+			getChildrenReply, err := SendClientGrpc[*pb.GetChildrenRequest, *pb.GetChildrenResponse](pb.NodeClient.GetChildren, &pb.GetChildrenRequest{Path: path, SetWatch: setWatch, ClientHost: host, ClientPort: strconv.Itoa(*port)}, *maxTimeout)
 
 			fmt.Printf("READ: %s has children: %s\n", path, getChildrenReply.Children)
 			if err != nil {
@@ -96,7 +102,7 @@ Loop:
 				break
 			}
 
-			getData, err := SendClientGrpc[*pb.GetDataRequest, *pb.GetDataResponse](pb.NodeClient.GetData, &pb.GetDataRequest{Path: path, SetWatch: setWatch}, *maxTimeout)
+			getData, err := SendClientGrpc[*pb.GetDataRequest, *pb.GetDataResponse](pb.NodeClient.GetData, &pb.GetDataRequest{Path: path, SetWatch: setWatch, ClientHost: host, ClientPort: strconv.Itoa(*port)}, *maxTimeout)
 
 			fmt.Printf("READ: %s has data:%b\n", path, getData.Data)
 			if err != nil {
@@ -112,7 +118,7 @@ Loop:
 				break
 			}
 
-			getExists, err := SendClientGrpc[*pb.GetExistsRequest, *pb.GetExistsResponse](pb.NodeClient.GetExists, &pb.GetExistsRequest{Path: path, SetWatch: setWatch}, *maxTimeout)
+			getExists, err := SendClientGrpc[*pb.GetExistsRequest, *pb.GetExistsResponse](pb.NodeClient.GetExists, &pb.GetExistsRequest{Path: path, SetWatch: setWatch, ClientHost: host, ClientPort: strconv.Itoa(*port)}, *maxTimeout)
 
 			if err != nil {
 				log.Printf("Error sending read request: %s\n", err)
@@ -156,7 +162,7 @@ Loop:
 				}
 
 			}
-			createRequest, err := SendClientGrpc[*pb.CUDRequest, *pb.CUDResponse](pb.NodeClient.HandleClientCUD, &pb.CUDRequest{Path: path, Data: []byte(data), Flags: &pb.Flag{IsSequential: setSequential, IsEphemeral: setEphemeral}, OperationType: pb.OperationType_WRITE}, *maxTimeout)
+			createRequest, err := SendClientGrpc[*pb.CUDSRequest, *pb.CUDSResponse](pb.NodeClient.HandleClientCUDS, &pb.CUDSRequest{Path: path, Data: []byte(data), Flags: &pb.Flag{IsSequential: setSequential, IsEphemeral: setEphemeral}, OperationType: pb.OperationType_WRITE}, *maxTimeout)
 
 			if err != nil {
 				log.Printf("Error sending create request: %s\n", err)
@@ -175,7 +181,7 @@ Loop:
 			path := command[1]
 			data := command[2]
 
-			setRequest, err := SendClientGrpc[*pb.CUDRequest, *pb.CUDResponse](pb.NodeClient.HandleClientCUD, &pb.CUDRequest{Path: path, Data: []byte(data), Flags: &pb.Flag{IsSequential: false, IsEphemeral: false}, OperationType: pb.OperationType_UPDATE}, *maxTimeout)
+			setRequest, err := SendClientGrpc[*pb.CUDSRequest, *pb.CUDSResponse](pb.NodeClient.HandleClientCUDS, &pb.CUDSRequest{Path: path, Data: []byte(data), Flags: &pb.Flag{IsSequential: false, IsEphemeral: false}, OperationType: pb.OperationType_UPDATE}, *maxTimeout)
 
 			if err != nil {
 				log.Printf("Error sending set request: %s\n", err)
@@ -193,14 +199,20 @@ Loop:
 
 			path := command[1]
 
-			deleteRequest, err := SendClientGrpc[*pb.CUDRequest, *pb.CUDResponse](pb.NodeClient.HandleClientCUD, &pb.CUDRequest{Path: path, Flags: &pb.Flag{IsSequential: false, IsEphemeral: false}, OperationType: pb.OperationType_DELETE}, *maxTimeout)
+			deleteRequest, err := SendClientGrpc[*pb.CUDSRequest, *pb.CUDSResponse](pb.NodeClient.HandleClientCUDS, &pb.CUDSRequest{Path: path, Flags: &pb.Flag{IsSequential: false, IsEphemeral: false}, OperationType: pb.OperationType_DELETE}, *maxTimeout)
 
 			if err != nil {
 				log.Printf("Error sending delete request: %s\n", err)
 			} else {
 				fmt.Printf("DELETE: %s is accepted: %t\n", path, *deleteRequest.Accept)
 			}
-
+		case "sync":
+			syncRequest, err := SendClientGrpc[*pb.CUDSRequest, *pb.CUDSResponse](pb.NodeClient.HandleClientCUDS, &pb.CUDSRequest{Path: "", Flags: &pb.Flag{IsSequential: false, IsEphemeral: false}, OperationType: pb.OperationType_SYNC}, *maxTimeout)
+			if err != nil {
+				log.Printf("Error sending sync request: %s\n", err)
+			} else {
+				fmt.Printf("SYNC: Accepted: %t\n", *syncRequest.Accept)
+			}
 		case "q":
 			fmt.Println("Quiting...")
 			break Loop
@@ -215,7 +227,21 @@ func main() {
 	// cli or file of commands to run
 	// goroutines
 	flag.Parse()
-	fmt.Printf("%v\n", port)
+
+	// handle watch callbacks
+	// setup zkcallback server
+	//TODO: Put this is some config file?
+	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", *port))
+	if err != nil {
+		log.Fatalf("failed to listen: %v", err)
+	} else {
+		fmt.Printf("Listening at: %v\n", *port)
+	}
+	grpc_s := grpc.NewServer()
+	client := Client{}
+	pb.RegisterZkCallbackServer(grpc_s, &client)
+	go grpc_s.Serve(lis)
+
 	menu()
 }
 func SendClientGrpc[T pb.Message, R pb.Message](

@@ -144,18 +144,18 @@ func (m *GetExistsResponse) Done(from int, to int) {
 	slog.Debug("GetExistsResponse", "from", from, "to", to)
 }
 
-func (m *CUDRequest) Error(from int, to int, err error) {
+func (m *CUDSRequest) Error(from int, to int, err error) {
 	log.Printf("%d error sending create node request to %d: %v", from, to, err)
 }
 
-func (m *CUDRequest) Done(from int, to int) {
+func (m *CUDSRequest) Done(from int, to int) {
 	slog.Debug("CUDRequest", "from", from, "to", to)
 }
 
-func (m *CUDResponse) Error(from int, to int, err error) {
+func (m *CUDSResponse) Error(from int, to int, err error) {
 	log.Printf("%d error sending create node response to %d: %v", from, to, err)
 }
 
-func (m *CUDResponse) Done(from int, to int) {
+func (m *CUDSResponse) Done(from int, to int) {
 	slog.Debug("CUDResponse", "from", from, "to", to)
 }
