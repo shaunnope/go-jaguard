@@ -57,14 +57,14 @@ func Simulate(s *Server, path string) {
 			log.Printf("c%d error generating random data: %v", s.Id, err)
 		}
 
-		req := &pb.CUDRequest{
+		req := &pb.CUDSRequest{
 			Path:          path,
 			Data:          data,
 			Flags:         &pb.Flag{IsSequential: false, IsEphemeral: false},
 			OperationType: pb.OperationType_WRITE,
 		}
 
-		cudReply, err := c.HandleClientCUD(ctx, req)
+		cudReply, err := c.HandleClientCUDS(ctx, req)
 		if err != nil {
 			log.Printf("%d error sending zab request: %v", s.Id, err)
 		} else {

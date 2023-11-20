@@ -162,8 +162,10 @@ func (s *Server) SendZabRequest(ctx context.Context, in *pb.ZabRequest) (*pb.Zab
 		s.Lock()
 		defer s.Unlock()
 		log.Printf("server %d update local copy", s.Id)
-		_, err := s.HandleOperation(transaction)
-
+		var err error
+		if transaction.Type != pb.OperationType_SYNC {
+			_, err = s.HandleOperation(transaction)
+		}
 		return &pb.ZabAck{Request: in}, err
 	}
 

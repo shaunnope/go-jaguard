@@ -6,6 +6,7 @@ enum OperationType {
     WRITE = 1;
     DELETE = 2;
     UPDATE = 3;
+    SYNC = 4;
 }
 
 message Zxid {
@@ -126,14 +127,14 @@ message GetExistsResponse {
     Zxid zxid = 3;
 }
 
-message CUDRequest {
+message CUDSRequest {
     string path = 1;
     bytes data = 2;
     Flag flags = 3;
     OperationType operationType = 4;
 }
 
-message CUDResponse {
+message CUDSResponse {
     optional bool accept = 1;
 }
 
@@ -153,6 +154,6 @@ service Node {
     rpc GetChildren(GetChildrenRequest) returns (GetChildrenResponse);
     rpc GetExists(GetExistsRequest) returns (GetExistsResponse);
 
-    // Client CUD Operations
-    rpc HandleClientCUD(CUDRequest) returns (CUDResponse);
+    // Client CUD Operations + SYNC
+    rpc HandleClientCUDS(CUDSRequest) returns (CUDSResponse);
 }

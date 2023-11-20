@@ -27,7 +27,7 @@ func (s *Server) SendPing(ctx context.Context, in *pb.Ping) (*pb.Ping, error) {
 	return &pb.Ping{Data: int64(s.Id)}, nil
 }
 
-// TODO: SetWatch
+// TODO: @waishun SetWatch
 
 func (s *Server) GetExists(ctx context.Context, in *pb.GetExistsRequest) (*pb.GetExistsResponse, error) {
 	node, err := s.StateVector.Data.GetNode(in.Path)

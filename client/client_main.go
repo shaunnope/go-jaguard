@@ -32,6 +32,7 @@ func listHelp() {
 	fmt.Println("	create path [data]") //create node in path (acl not implemented)
 	fmt.Println("	delete path")        //delete node in path (-v version flag not implemented)
 	fmt.Println("	set path data")      //set data of node in path (-v version flag not implemented)
+	fmt.Println("	sync")               //set data of node in path (-v version flag not implemented)
 
 	fmt.Println("	q")
 	fmt.Println("----------------------")
@@ -156,7 +157,7 @@ Loop:
 				}
 
 			}
-			createRequest, err := SendClientGrpc[*pb.CUDRequest, *pb.CUDResponse](pb.NodeClient.HandleClientCUD, &pb.CUDRequest{Path: path, Data: []byte(data), Flags: &pb.Flag{IsSequential: setSequential, IsEphemeral: setEphemeral}, OperationType: pb.OperationType_WRITE}, *maxTimeout)
+			createRequest, err := SendClientGrpc[*pb.CUDSRequest, *pb.CUDSResponse](pb.NodeClient.HandleClientCUDS, &pb.CUDSRequest{Path: path, Data: []byte(data), Flags: &pb.Flag{IsSequential: setSequential, IsEphemeral: setEphemeral}, OperationType: pb.OperationType_WRITE}, *maxTimeout)
 
 			if err != nil {
 				log.Printf("Error sending create request: %s\n", err)
@@ -175,7 +176,7 @@ Loop:
 			path := command[1]
 			data := command[2]
 
-			setRequest, err := SendClientGrpc[*pb.CUDRequest, *pb.CUDResponse](pb.NodeClient.HandleClientCUD, &pb.CUDRequest{Path: path, Data: []byte(data), Flags: &pb.Flag{IsSequential: false, IsEphemeral: false}, OperationType: pb.OperationType_UPDATE}, *maxTimeout)
+			setRequest, err := SendClientGrpc[*pb.CUDSRequest, *pb.CUDSResponse](pb.NodeClient.HandleClientCUDS, &pb.CUDSRequest{Path: path, Data: []byte(data), Flags: &pb.Flag{IsSequential: false, IsEphemeral: false}, OperationType: pb.OperationType_UPDATE}, *maxTimeout)
 
 			if err != nil {
 				log.Printf("Error sending set request: %s\n", err)
@@ -193,14 +194,20 @@ Loop:
 
 			path := command[1]
 
-			deleteRequest, err := SendClientGrpc[*pb.CUDRequest, *pb.CUDResponse](pb.NodeClient.HandleClientCUD, &pb.CUDRequest{Path: path, Flags: &pb.Flag{IsSequential: false, IsEphemeral: false}, OperationType: pb.OperationType_DELETE}, *maxTimeout)
+			deleteRequest, err := SendClientGrpc[*pb.CUDSRequest, *pb.CUDSResponse](pb.NodeClient.HandleClientCUDS, &pb.CUDSRequest{Path: path, Flags: &pb.Flag{IsSequential: false, IsEphemeral: false}, OperationType: pb.OperationType_DELETE}, *maxTimeout)
 
 			if err != nil {
 				log.Printf("Error sending delete request: %s\n", err)
 			} else {
 				fmt.Printf("DELETE: %s is accepted: %t\n", path, *deleteRequest.Accept)
 			}
-
+		case "sync":
+			syncRequest, err := SendClientGrpc[*pb.CUDSRequest, *pb.CUDSResponse](pb.NodeClient.HandleClientCUDS, &pb.CUDSRequest{Path: "", Flags: &pb.Flag{IsSequential: false, IsEphemeral: false}, OperationType: pb.OperationType_SYNC}, *maxTimeout)
+			if err != nil {
+				log.Printf("Error sending sync request: %s\n", err)
+			} else {
+				fmt.Printf("SYNC: Accepted: %t\n", *syncRequest.Accept)
+			}
 		case "q":
 			fmt.Println("Quiting...")
 			break Loop

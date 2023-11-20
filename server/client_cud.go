@@ -7,7 +7,7 @@ import (
 	pb "github.com/shaunnope/go-jaguard/zouk"
 )
 
-func (s *Server) HandleClientCUD(ctx context.Context, in *pb.CUDRequest) (*pb.CUDResponse, error) {
+func (s *Server) HandleClientCUDS(ctx context.Context, in *pb.CUDSRequest) (*pb.CUDSResponse, error) {
 	isLeader := s.GetState() == LEADING
 
 	// if leader send proposal to all followers in for loop (rpc)
@@ -76,7 +76,10 @@ func (s *Server) HandleClientCUD(ctx context.Context, in *pb.CUDRequest) (*pb.CU
 		// @Shi Hui: Leader commit change on local copy
 		// LEADER need to execute request
 		transaction := msg.Transaction.Extract()
-		_, err := s.HandleOperation(transaction)
+		var err error
+		if in.OperationType != pb.OperationType_SYNC {
+			_, err = s.HandleOperation(transaction)
+		}
 
 		msg.RequestType = pb.RequestType_ANNOUNCEMENT
 		for idx := range s.Leader.FollowerEpochs {
@@ -89,12 +92,12 @@ func (s *Server) HandleClientCUD(ctx context.Context, in *pb.CUDRequest) (*pb.CU
 		}
 		defer s.Unlock()
 		accepted := true
-		return &pb.CUDResponse{Accept: &accepted}, err
+		return &pb.CUDSResponse{Accept: &accepted}, err
 	} else {
 		log.Printf("server %d forwarding request to %d", s.Id, s.Vote.Id)
 		// todo verify version
 		// forward to leader
-		r, err := SendGrpc[*pb.CUDRequest, *pb.CUDResponse](pb.NodeClient.HandleClientCUD, s, s.Vote.Id, in, *maxTimeout)
+		r, err := SendGrpc[*pb.CUDSRequest, *pb.CUDSResponse](pb.NodeClient.HandleClientCUDS, s, s.Vote.Id, in, *maxTimeout)
 
 		return r, err
 	}
