@@ -138,6 +138,15 @@ message CUDSResponse {
     optional bool accept = 1;
 }
 
+message WatchNotification {
+    string path = 1;
+    OperationType operationType = 2;
+}
+
+message WatchNotificationResponse {
+    optional bool accept = 1;
+}
+
 service Node {
     rpc SendPing (Ping) returns (Ping);
 
@@ -156,4 +165,8 @@ service Node {
 
     // Client CUD Operations + SYNC
     rpc HandleClientCUDS(CUDSRequest) returns (CUDSResponse);
+}
+
+service ZkCallback {
+    rpc NotifyWatchTrigger(WatchNotification) returns (WatchNotificationResponse);
 }

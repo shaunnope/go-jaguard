@@ -131,6 +131,19 @@ func Run(idx int) {
 		go Simulate(node, "/cli3-1")
 	}
 
+	if *call_watch {
+		fmt.Printf("Test watch\n")
+		callbackAddr := fmt.Sprintf("%s:%d", "localhost", 50057)
+		conn, err := grpc.Dial(callbackAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+
+		if err != nil {
+			fmt.Println("Couldnt connect to zkclient")
+		}
+		defer conn.Close()
+		client := pb.NewZkCallbackClient(conn)
+		client.NotifyWatchTrigger(context.Background(), &pb.WatchNotification{Path: "/test", OperationType: pb.OperationType_DELETE})
+	}
+
 	// start grpc service (blocking)
 	if err := grpc_s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)

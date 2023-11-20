@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"strings"
 	"time"
@@ -17,7 +18,7 @@ import (
 
 var (
 	// flags
-	port       = flag.Int("port", 50051, "server port")
+	port       = flag.Int("port", 50057, "server port")
 	addr       = flag.String("addr", "localhost:50051", "the address to connect to")
 	maxTimeout = flag.Int("maxTimeout", 100000, "max timeout for election")
 )
@@ -222,7 +223,21 @@ func main() {
 	// cli or file of commands to run
 	// goroutines
 	flag.Parse()
-	fmt.Printf("%v\n", port)
+
+	// handle watch callbacks
+	// setup zkcallback server
+	//TODO: Put this is some config file?
+	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", *port))
+	if err != nil {
+		log.Fatalf("failed to listen: %v", err)
+	} else {
+		fmt.Printf("Listening at: %v\n", *port)
+	}
+	grpc_s := grpc.NewServer()
+	client := Client{}
+	pb.RegisterZkCallbackServer(grpc_s, &client)
+	go grpc_s.Serve(lis)
+
 	menu()
 }
 func SendClientGrpc[T pb.Message, R pb.Message](
