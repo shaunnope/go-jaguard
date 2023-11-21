@@ -46,11 +46,18 @@ func (t TransactionFragment) String() string {
 	return fmt.Sprintf("{%d %d} %s @ %s %v", t.Zxid.Epoch, t.Zxid.Counter, t.Type, t.Path, t.Data)
 }
 
-type TransactionFragments []TransactionFragment
+type TransactionFragments struct {
+	Transactions []TransactionFragment
+	LastCommitId int
+}
+
+func (ts TransactionFragments) Len() int {
+	return len(ts.Transactions)
+}
 
 func (ts TransactionFragments) Raw() []*Transaction {
-	res := make([]*Transaction, len(ts))
-	for i, t := range ts {
+	res := make([]*Transaction, len(ts.Transactions))
+	for i, t := range ts.Transactions {
 		res[i] = &Transaction{
 			Zxid:  t.Zxid.Raw(),
 			Path:  t.Path,
@@ -60,6 +67,24 @@ func (ts TransactionFragments) Raw() []*Transaction {
 		}
 	}
 	return res
+}
+
+func (ts *TransactionFragments) LastCommitZxid() ZxidFragment {
+	if ts.LastCommitId == -1 {
+		return ZxidFragment{Epoch: -1}
+	}
+	return ts.Transactions[ts.LastCommitId].Zxid
+}
+
+func (ts *TransactionFragments) Set(hist []TransactionFragment) {
+	ts.Transactions = hist
+	ts.LastCommitId = -1
+}
+
+func (ts *TransactionFragments) CommitAll() {
+	for i := 0; i < len(ts.Transactions); i++ {
+		ts.Transactions[i].Committed = true
+	}
 }
 
 func (t *Transaction) Extract() TransactionFragment {
@@ -80,7 +105,7 @@ func (t *Transaction) ExtractLog() TransactionFragment {
 	}
 }
 
-func (t *Transaction) ExtractLogString() string {
+func (t *Transaction) LogString() string {
 	return fmt.Sprintf("Zxid: %v %s @ PATH: %s", t.Zxid.Extract(), t.Type, t.Path)
 }
 

@@ -62,30 +62,30 @@ func (m *Ping) Done(from int, to int) {
 }
 
 func (m *ElectNotification) Error(from int, to int, err error) {
-	log.Printf("%d error sending vote notif to %d: %v", from, to, err)
+	slog.Error("ElectNotif", "from", from, "to", to, "err", err)
 }
 
 func (m *ElectNotification) Done(from int, to int) {
-	slog.Debug("ElectNotification", "from", from, "to", to)
+	slog.Debug("ElectNotif", "from", from, "to", to)
 }
 
 func (m *ElectResponse) Error(from int, to int, err error) {
-	log.Printf("%d error sending vote response to %d: %v", from, to, err)
+	slog.Error("ElectRes", "from", from, "to", to, "err", err)
 }
 
 func (m *ElectResponse) Done(from int, to int) {
-	slog.Debug("ElectResponse", "from", from, "to", to)
+	slog.Debug("ElectRes", "from", from, "to", to)
 }
 
 func (m *ZabRequest) Error(from int, to int, err error) {
-	log.Printf("%d error sending zab request to %d: %v", from, to, err)
+	slog.Error("ZabRequest", "from", from, "to", to, "err", err)
 }
 
 func (m *ZabRequest) Done(from int, to int) {
 	if m.Transaction == nil {
 		return
 	}
-	slog.Debug("ZabRequest", "from", from, "to", to, "request", m.Transaction.ExtractLogString())
+	slog.Debug("ZabRequest", "from", from, "to", to, "request", m.Transaction.LogString())
 }
 
 func (m *ZabAck) Error(from int, to int, err error) {

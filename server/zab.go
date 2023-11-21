@@ -25,51 +25,56 @@ func (s *Server) InformLeader(ctx context.Context, in *pb.FollowerInfo) (*pb.Pin
 	slog.Info("FollowerInfo", "s", s.Id, "from", in.Id, "lastZxid", in.LastZxid.Extract())
 	s.Zab.Lock()
 	defer s.Zab.Unlock()
+	switch int(in.LastZxid.Counter) {
+	case -1:
+		// phase 1
+		if !s.Zab.HasQuorum {
+			// leader has not received quorum. update leader table
+			s.Zab.FollowerEpochs[int(in.Id)] = int(in.LastZxid.Epoch)
 
-	if !s.Zab.HasQuorum {
-		// leader has not received quorum. update leader table
-		s.Zab.FollowerEpochs[int(in.Id)] = int(in.LastZxid.Epoch)
-
-		jsonData, err := json.MarshalIndent(s.Zab.FollowerEpochs, "", "  ")
-		if err != nil {
-			log.Fatalf("JSON Marshaling failed: %s", err)
-		}
-		fmt.Println(string(jsonData))
-
-		if len(s.Zab.FollowerEpochs) > len(config.Servers)/2 {
-			slog.Debug("Got quorum", "s", s.Id)
-			s.Zab.HasQuorum = true
-			s.Zab.QuorumReady <- true
-		}
-
-	} else {
-		// phase 3
-		go func() {
-			slog.Info("Waiting for Broadcast to begin", "s", s.Id, "from", in.Id)
-			_, ok := <-s.Zab.BroadcastReady
-			if ok {
-				panic(fmt.Sprintf("%d -> %d: unexpected data on BroadcastReady", in.Id, s.Id))
+			jsonData, err := json.MarshalIndent(s.Zab.FollowerEpochs, "", "  ")
+			if err != nil {
+				log.Fatalf("JSON Marshaling failed: %s", err)
 			}
-			slog.Info("Broadcast ready", "s", s.Id, "from", in.Id)
-			s.Zab.Lock()
-			defer s.Zab.Unlock()
-			// TODO: send NEWEPOCH and NEWLEADER to new follower
-			SendGrpc[*pb.NewEpoch, *pb.AckEpoch](pb.NodeClient.ProposeEpoch, s, int(in.Id), &pb.NewEpoch{Epoch: int64(s.CurrentEpoch)}, *maxTimeout)
+			fmt.Println(string(jsonData))
 
-			msg := &pb.NewLeader{Epoch: int64(s.LastZxid.Epoch), History: s.History.Raw()}
-			if r, err := SendGrpc[*pb.NewLeader, *pb.AckLeader](
-				pb.NodeClient.ProposeLeader,
-				s, int(in.Id), msg,
-				*maxTimeout); err == nil {
-				SendGrpc[*pb.ZabRequest, *pb.Ping](
-					pb.NodeClient.Commit,
-					s, int(in.Id), &pb.ZabRequest{},
-					*maxTimeout)
-				// update leader table
-				s.Zab.FollowerEpochs[int(in.Id)] = int(r.Epoch)
+			if len(s.Zab.FollowerEpochs) > len(config.Servers)/2 {
+				slog.Debug("Got quorum", "s", s.Id)
+				s.Zab.HasQuorum = true
+				s.Zab.QuorumReady <- true
 			}
 
-		}()
+		} else {
+			// phase 3
+			go func() {
+				slog.Debug("Waiting for Broadcast", "s", s.Id, "from", in.Id)
+				s.WaitForBroadcast()
+				slog.Info("Broadcast ready", "s", s.Id, "from", in.Id)
+
+				s.Zab.Lock()
+				defer s.Zab.Unlock()
+				// send NEWEPOCH and NEWLEADER to new follower
+				SendGrpc[*pb.NewEpoch, *pb.AckEpoch](pb.NodeClient.ProposeEpoch, s, int(in.Id), &pb.NewEpoch{Epoch: int64(s.CurrentEpoch)}, *maxTimeout)
+
+				msg := &pb.NewLeader{Epoch: int64(s.LastZxid.Epoch), History: s.History.Raw()}
+				if r, err := SendGrpc[*pb.NewLeader, *pb.AckLeader](
+					pb.NodeClient.ProposeLeader,
+					s, int(in.Id), msg,
+					*maxTimeout); err == nil {
+					SendGrpc[*pb.ZabRequest, *pb.Ping](
+						pb.NodeClient.Commit,
+						s, int(in.Id), &pb.ZabRequest{},
+						*maxTimeout)
+					// update leader table
+					s.Zab.FollowerEpochs[int(in.Id)] = int(r.Epoch)
+				}
+
+			}()
+		}
+
+	default:
+		// recovery
+		// msg := &pb.NewLeader{LastZxid: s.LastZxid.Raw()}
 	}
 
 	return &pb.Ping{Data: int64(s.CurrentEpoch)}, nil
@@ -91,13 +96,8 @@ func (s *Server) ProposeEpoch(ctx context.Context, in *pb.NewEpoch) (*pb.AckEpoc
 	log.Printf("%d rejected new epoch: %d", s.Id, in.Epoch)
 
 	if int(in.Epoch) < s.AcceptedEpoch {
-		// s.Lock()
-		// s.Unlock()
-		s.FastElection(*maxTimeout)
 		go func() {
-			// FIXME: issue - Election requires lock, but is held by Discovery
-			// vote := s.FastElection(*maxTimeout)
-
+			s.Reelect <- true
 		}()
 	}
 
@@ -114,9 +114,11 @@ func (s *Server) ProposeLeader(ctx context.Context, in *pb.NewLeader) (*pb.AckLe
 		// TODO: atomically
 		s.CurrentEpoch = int(in.Epoch)
 
-		// accept transactions in order of zxid, update history
+		// TODO: accept transactions in order of zxid
+
+		// update history
 		// TODO: store to non-volatile memory
-		s.History = pb.Transactions(in.History).ExtractAll()
+		s.History.Set(pb.Transactions(in.History).ExtractAll())
 
 		slog.Debug("Accept Leader", "s", s.Id, "epoch", in.Epoch)
 		s.AcceptedEpoch = int(in.Epoch)
@@ -125,16 +127,9 @@ func (s *Server) ProposeLeader(ctx context.Context, in *pb.NewLeader) (*pb.AckLe
 	}
 	log.Printf("%d rejected new leader: %d", s.Id, in.Epoch)
 
-	if int(in.Epoch) < s.AcceptedEpoch {
-		// s.Lock()
-		// s.Unlock()
-		s.FastElection(*maxTimeout)
-		go func() {
-			// FIXME: issue - Election requires lock, but is held by Discovery
-			// vote := s.FastElection(*maxTimeout)
-
-		}()
-	}
+	go func() {
+		s.Reelect <- true
+	}()
 
 	return nil, errors.New("leader not accepted")
 }
@@ -147,12 +142,10 @@ func (s *Server) Commit(ctx context.Context, in *pb.ZabRequest) (*pb.Ping, error
 
 	if in.Transaction == nil {
 		// Commit all outstanding transactions
-		for _, transaction := range s.History {
-			if s.ZabDeliver(transaction) != nil {
-				return nil, errors.New("failed to deliver")
-			}
+		if err := s.ZabDeliverAll(); err != nil {
+			return nil, err
 		}
-		slog.Debug("Committed", "s", s.Id, "epoch", s.CurrentEpoch)
+		slog.Debug("Committed", "s", s.Id, "zxid", s.LastZxid)
 
 	} else {
 		if in.Transaction.Zxid == nil {
@@ -179,7 +172,7 @@ func (s *Server) SendZabRequest(ctx context.Context, in *pb.ZabRequest) (*pb.Zab
 	// Handle incoming CreateRequest
 	switch in.RequestType {
 	case pb.RequestType_PROPOSAL:
-		slog.Info("Proposal", "s", s.Id, "txn", in.Transaction.ExtractLogString())
+		slog.Info("Proposal", "s", s.Id, "txn", in.Transaction.LogString())
 
 		// TODO: verify version
 		// send ack to leader
@@ -195,26 +188,25 @@ func (s *Server) SendZabRequest(ctx context.Context, in *pb.ZabRequest) (*pb.Zab
 		s.Lock()
 		defer s.Unlock()
 		log.Printf("server %d update local copy", s.Id)
-		var err error
 		if transaction.Type != pb.OperationType_SYNC {
 			if transaction.Type == pb.OperationType_DELETE || transaction.Type == pb.OperationType_UPDATE {
-				transactionFrag := in.Transaction.ExtractLog()
-				watchesTriggered := s.Data.CheckWatchTrigger(&transactionFrag)
+				watchesTriggered := s.Data.CheckWatchTrigger(&transaction)
 				for i := 0; i < len(watchesTriggered); i++ {
 					TriggerWatch(watchesTriggered[i], transaction.Type)
 				}
 			}
-			_, err = s.HandleOperation(transaction)
-			if transaction.Type == pb.OperationType_WRITE {
-				transactionFrag := in.Transaction.ExtractLog()
-				watchesTriggered := s.Data.CheckWatchTrigger(&transactionFrag)
+			if err := s.ZabDeliver(transaction); err != nil {
+				slog.Error("ZabDeliver", "s", s.Id, "err", "failed to deliver", "txn", transaction)
+				return nil, err
+
+			} else if transaction.Type == pb.OperationType_WRITE {
+				watchesTriggered := s.Data.CheckWatchTrigger(&transaction)
 				for i := 0; i < len(watchesTriggered); i++ {
 					TriggerWatch(watchesTriggered[i], transaction.Type)
 				}
 			}
 		}
-		return &pb.ZabAck{Request: in}, err
-		// return &pb.ZabAck{Request: in}, s.ZabDeliver(transaction)
+		return &pb.ZabAck{Request: in}, nil
 	}
 
 	return nil, errors.New("zab request not accepted")
@@ -270,14 +262,19 @@ func (s *Server) HandleOperation(transaction pb.TransactionFragment) (string, er
 
 // end grpc calls
 
-// Routine to maintain Zab Session
-func (s *Server) ZabStart() {
-	if vote := s.FastElection(*maxTimeout); vote.Id == -1 {
+// Routine to start Zab Session
+func (s *Server) ZabStart(t0 int) error {
+	if vote := s.FastElection(t0); vote.Id == -1 {
 		slog.Error("Election failed", "s", s.Id)
-	} else {
-		s.Discovery()
+		return errors.New("failed to elect leader")
 	}
 
+	go s.Heartbeat()
+	time.Sleep(200 * time.Millisecond)
+
+	s.Discovery()
+	slog.Info("Finished discovery", "s", s.Id)
+	return nil
 }
 
 // Phase 1 of ZAB
@@ -321,7 +318,7 @@ func (s *Server) Discovery() {
 
 		log.Printf("%d most recent: %d", s.Id, mostRecent.CurrentEpoch)
 		// TODO: store to non-volatile memory
-		s.History = pb.Transactions(mostRecent.History).ExtractAll()
+		s.History.Set(pb.Transactions(mostRecent.History).ExtractAll())
 		s.Zab.Unlock()
 
 		// goto phase 2
@@ -367,13 +364,11 @@ func (s *Server) ZabSync() {
 	}
 
 	// phase 3
-	for _, t := range s.History {
-		if s.ZabDeliver(t) != nil {
-			slog.Error("ZabSync", "s", s.Id, "err", "failed to deliver", "txn", t)
-			panic("failed to deliver")
-		}
+	if err := s.ZabDeliverAll(); err != nil {
+		slog.Error("ZabSync", "s", s.Id, "err", err)
+		panic("failed to deliver")
 	}
-	if len(s.History) == 0 {
+	if s.History.Len() == 0 {
 		s.LastZxid = pb.ZxidFragment{Epoch: s.CurrentEpoch}
 	}
 
@@ -381,6 +376,13 @@ func (s *Server) ZabSync() {
 }
 
 // Phase 3 utils
+
+// Wait for BroadcastReady
+func (s *Server) WaitForBroadcast() {
+	if _, ok := <-s.Zab.BroadcastReady; ok {
+		panic(fmt.Sprintf("%d: unexpected data on BroadcastReady", s.Id))
+	}
+}
 
 // Commit a transaction locally.
 //
@@ -392,9 +394,29 @@ func (s *Server) ZabDeliver(t pb.TransactionFragment) error {
 	}
 
 	t.Committed = true
-	s.History = append(s.History, t)
+	// s.History = append(s.History, t)
 	s.LastZxid = t.Zxid
 	slog.Info("Commit", "s", s.Id, "txn", t)
+
+	return nil
+}
+
+// Commit all outstanding transactions
+//
+// Note: This should be run synchronously
+func (s *Server) ZabDeliverAll() error {
+	for i := s.History.LastCommitId + 1; i < s.History.Len(); i++ {
+		t := s.History.Transactions[i]
+		// TODO: non-volatile memory
+		if _, err := s.HandleOperation(t); err != nil {
+			return err
+		}
+
+		t.Committed = true
+		s.History.LastCommitId = i
+	}
+	s.LastZxid = s.History.LastCommitZxid()
+	slog.Info("CommitAll", "s", s.Id, "zxid", s.LastZxid)
 
 	return nil
 }

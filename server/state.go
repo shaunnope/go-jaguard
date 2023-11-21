@@ -81,8 +81,11 @@ type StateVector struct {
 	AcceptedEpoch int // last NewEpoch
 	CurrentEpoch  int // last NewLeader
 
-	// channel to stop server
+	// channels to trigger events
+	// Stop the server
 	Stop chan bool
+	// Elect a new leader
+	Reelect chan bool
 
 	// states related to Zab Session
 	Zab ZabSession
@@ -99,6 +102,7 @@ func NewStateVector(idx int) StateVector {
 		Zab:         NewZabSession(),
 		Data:        pb.NewDataTree(),
 		Stop:        make(chan bool),
+		Reelect:     make(chan bool),
 		Vote: pb.VoteFragment{
 			LastZxid: pb.ZxidFragment{
 				Epoch:   0,

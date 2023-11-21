@@ -36,17 +36,13 @@ func (s *Server) Serve(grpc_s *grpc.Server) {
 	if *leader_verbo {
 		log.Printf("%d begin election ", s.Id)
 	}
-	if vote := s.FastElection(*maxTimeout); vote.Id == -1 {
-		log.Fatalf("%d failed to elect leader", s.Id)
+	if err := s.ZabStart(*maxTimeout); err != nil {
+		log.Fatalf("%d failed to start zab: %v", s.Id, err)
 	}
 
-	go s.Heartbeat()
-	time.Sleep(200 * time.Millisecond)
-
-	s.Discovery()
-	log.Printf("%d finished discovery", s.Id)
-
-	<-s.Stop
+	if _, ok := <-s.Stop; ok {
+		panic(fmt.Sprintf("%d: unexpected data on Stop", s.Id))
+	}
 	grpc_s.GracefulStop()
 }
 
