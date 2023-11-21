@@ -43,7 +43,7 @@ func (s *Server) HandleClientCUDS(ctx context.Context, in *pb.CUDSRequest) (*pb.
 		slog.Info("Client Propose", "s", s.Id, "majority", majoritySize, "request", msg)
 		done := make(chan bool, majoritySize)
 
-		log.Printf("server %d prepare to send message: %s", s.Id, msg.Transaction.ExtractLogString())
+		log.Printf("server %d prepare to send message: %s", s.Id, msg.Transaction.LogString())
 		copiedMsg := &pb.ZabRequest{
 			Transaction: msg.Transaction,
 			RequestType: msg.RequestType,
@@ -105,4 +105,53 @@ func (s *Server) HandleClientCUDS(ctx context.Context, in *pb.CUDSRequest) (*pb.
 		return &pb.CUDSResponse{Accept: &accepted}, nil
 	}
 
+}
+
+func (s *Server) GetExists(ctx context.Context, in *pb.GetExistsRequest) (*pb.GetExistsResponse, error) {
+	node, err := s.StateVector.Data.GetNode(in.Path)
+	if node == nil {
+		return &pb.GetExistsResponse{Exists: false, Zxid: s.LastZxid.Inc().Raw()}, err
+	}
+	if in.SetWatch {
+		s.StateVector.Data.AddWatchToNode(in.Path, &pb.Watch{
+			Path:       in.Path,
+			Type:       pb.Exists,
+			ClientAddr: pb.Addr{Host: in.ClientHost, Port: in.ClientPort},
+		})
+	}
+
+	return &pb.GetExistsResponse{Exists: true, Zxid: s.LastZxid.Inc().Raw()}, err
+}
+
+func (s *Server) GetData(ctx context.Context, in *pb.GetDataRequest) (*pb.GetDataResponse, error) {
+	data, err := s.StateVector.Data.GetData(in.Path)
+	if in.SetWatch {
+		s.StateVector.Data.AddWatchToNode(in.Path, &pb.Watch{
+			Path:       in.Path,
+			Type:       pb.GetData,
+			ClientAddr: pb.Addr{Host: in.ClientHost, Port: in.ClientPort},
+		})
+	}
+
+	return &pb.GetDataResponse{Data: data, Zxid: s.LastZxid.Inc().Raw()}, err
+}
+
+func (s *Server) GetChildren(ctx context.Context, in *pb.GetChildrenRequest) (*pb.GetChildrenResponse, error) {
+	children, err := s.StateVector.Data.GetNodeChildren(in.Path)
+
+	fmt.Printf("Host:%s, Port:%s\n", in.ClientHost, in.ClientPort)
+	if in.SetWatch {
+		s.StateVector.Data.AddWatchToNode(in.Path, &pb.Watch{
+			Path:       in.Path,
+			Type:       pb.GetChildren,
+			ClientAddr: pb.Addr{Host: in.ClientHost, Port: in.ClientPort},
+		})
+	}
+	//Type conversion
+	out := make([]string, 0)
+	for key := range children {
+		out = append(out, key)
+	}
+
+	return &pb.GetChildrenResponse{Children: out, Zxid: s.LastZxid.Inc().Raw()}, err
 }

@@ -27,55 +27,6 @@ func (s *Server) SendPing(ctx context.Context, in *pb.Ping) (*pb.Ping, error) {
 	return &pb.Ping{Data: int64(s.Id)}, nil
 }
 
-func (s *Server) GetExists(ctx context.Context, in *pb.GetExistsRequest) (*pb.GetExistsResponse, error) {
-	node, err := s.StateVector.Data.GetNode(in.Path)
-	if node == nil {
-		return &pb.GetExistsResponse{Exists: false, Zxid: s.LastZxid.Inc().Raw()}, err
-	}
-	if in.SetWatch {
-		s.StateVector.Data.AddWatchToNode(in.Path, &pb.Watch{
-			Path:       in.Path,
-			Type:       pb.Exists,
-			ClientAddr: pb.Addr{Host: in.ClientHost, Port: in.ClientPort},
-		})
-	}
-
-	return &pb.GetExistsResponse{Exists: true, Zxid: s.LastZxid.Inc().Raw()}, err
-}
-
-func (s *Server) GetData(ctx context.Context, in *pb.GetDataRequest) (*pb.GetDataResponse, error) {
-	data, err := s.StateVector.Data.GetData(in.Path)
-	if in.SetWatch {
-		s.StateVector.Data.AddWatchToNode(in.Path, &pb.Watch{
-			Path:       in.Path,
-			Type:       pb.GetData,
-			ClientAddr: pb.Addr{Host: in.ClientHost, Port: in.ClientPort},
-		})
-	}
-
-	return &pb.GetDataResponse{Data: data, Zxid: s.LastZxid.Inc().Raw()}, err
-}
-
-func (s *Server) GetChildren(ctx context.Context, in *pb.GetChildrenRequest) (*pb.GetChildrenResponse, error) {
-	children, err := s.StateVector.Data.GetNodeChildren(in.Path)
-
-	fmt.Printf("Host:%s, Port:%s\n", in.ClientHost, in.ClientPort)
-	if in.SetWatch {
-		s.StateVector.Data.AddWatchToNode(in.Path, &pb.Watch{
-			Path:       in.Path,
-			Type:       pb.GetChildren,
-			ClientAddr: pb.Addr{Host: in.ClientHost, Port: in.ClientPort},
-		})
-	}
-	//Type conversion
-	out := make([]string, 0)
-	for key := range children {
-		out = append(out, key)
-	}
-
-	return &pb.GetChildrenResponse{Children: out, Zxid: s.LastZxid.Inc().Raw()}, err
-}
-
 // Start server
 //
 // Use reference to grpc server to stop it
@@ -114,21 +65,7 @@ func Run(idx int) {
 	// Run fast election then maintain heartbeat
 	go node.Serve(grpc_s)
 
-	if idx == 1 && *multiple_req {
-		log.Printf("server %d received request from client", idx)
-		go Simulate(node, "/foo")
-		go Simulate(node, "/bar")
-	}
-
-	if idx == 2 && *multiple_cli {
-		log.Printf("server %d received request from client", idx)
-		go Simulate(node, "/cli2-1")
-	}
-
-	if idx == 3 && *multiple_cli {
-		log.Printf("server %d received request from client", idx)
-		go Simulate(node, "/cli3-1")
-	}
+	Checkpoint2(idx, node)
 
 	if *call_watch {
 		fmt.Printf("Test watch\n")
