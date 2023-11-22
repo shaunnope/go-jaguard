@@ -24,6 +24,12 @@ func (z ZxidFragment) GreaterThan(other ZxidFragment) bool {
 	return z.Epoch > other.Epoch || (z.Epoch == other.Epoch && z.Counter > other.Counter)
 }
 
+// Increment epoch and reset counter
+func (z ZxidFragment) Next() ZxidFragment {
+	return ZxidFragment{Epoch: z.Epoch + 1, Counter: 0}
+}
+
+// Increment counter
 func (z ZxidFragment) Inc() ZxidFragment {
 	return ZxidFragment{Epoch: z.Epoch, Counter: z.Counter + 1}
 }
@@ -77,10 +83,12 @@ func (ts *TransactionFragments) LastCommitZxid() ZxidFragment {
 }
 
 func (ts *TransactionFragments) Set(hist []TransactionFragment) {
+	// TODO: update non-volatile memory
 	ts.Transactions = hist
 	ts.LastCommitId = -1
 }
 
+// TODO: consider if this is needed
 func (ts *TransactionFragments) CommitAll() {
 	for i := 0; i < len(ts.Transactions); i++ {
 		ts.Transactions[i].Committed = true
