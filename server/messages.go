@@ -22,7 +22,8 @@ func SendGrpc[T pb.Message, R pb.Message](
 ) (R, error) {
 	var err error = nil
 	var r R
-	for count := 0; err == nil && count < 3; count++ {
+	for count := 0; err == nil && count < 5; count++ {
+
 		ctx, cancel := s.EstablishConnection(to, timeout)
 		conn := s.Connections[to]
 		defer cancel()

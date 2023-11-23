@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
+	"strconv"
 	"time"
 
 	"github.com/shaunnope/go-jaguard/zouk"
@@ -99,7 +101,7 @@ func (s *Server) EstablishConnection(to int, timeout int) (context.Context, cont
 //
 // Use reference to grpc server to stop it
 func (s *Server) Serve(grpc_s *grpc.Server) {
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(time.Duration(10000) * time.Millisecond)
 	if *leader_verbo {
 		log.Printf("server %d begins fast leader election ", s.Id)
 	}
@@ -124,8 +126,16 @@ func (s *Server) Serve(grpc_s *grpc.Server) {
 }
 
 func Run(idx int) {
-	addr := config.Servers[idx]
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", addr.Port))
+	port, err := strconv.Atoi(os.Getenv("PORT"))
+	if err != nil {
+		log.Fatalf("failed to get PORT from environment: %v", err)
+	}
+
+	fmt.Printf("Starting server on port %d\n", port)
+
+	// addr := config.Servers[idx]
+	// lis, err := net.Listen("tcp", fmt.Sprintf(":%d", addr.Port))
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}

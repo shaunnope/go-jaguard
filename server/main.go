@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 )
 
 var (
@@ -38,9 +39,16 @@ func main() {
 	flag.Parse()
 	parseConfig(*configPath)
 
-	for idx := range config.Servers {
+	for idx := 0; idx < 1; idx++ {
 		// Initialise each server's file as empty file
-		fileName := fmt.Sprintf("server%d.txt", idx)
+		id, dock_err := strconv.Atoi(os.Getenv("ID"))
+		if dock_err != nil {
+			log.Fatalf("failed to get ID from environment: %v", dock_err)
+		}
+
+		fmt.Printf("Starting server %d\n", id)
+
+		fileName := fmt.Sprintf("server%d.txt", id)
 		_, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 		if err != nil {
 			// Handle the error
@@ -48,7 +56,7 @@ func main() {
 			return
 		}
 		// Start zookeeper server with index idx
-		go Run(idx)
+		go Run(id)
 	}
 
 	var input string

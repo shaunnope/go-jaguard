@@ -1,27 +1,102 @@
 version: '3.8'
 services:
-  server:
+  server-0:
     build: 
       context: .
       dockerfile: ./server/Dockerfile
-    container_name: server
+    image: zookeeper_server:latest
     ports:
       - "50051:50051"
     networks:
       - mynetwork
     command: bash -c "go run *.go"
     tty: true
+    environment:
+      - PORT=50051
+      - ID=0
+
+  server-1:
+    image: zookeeper_server:latest
+    ports:
+      - "50052:50052"
+    networks:
+      - mynetwork
+    command: bash -c "go run *.go"
+    tty: true
+    depends_on:
+    - server-0
+    environment:
+      - PORT=50052
+      - ID=1
+
+  server-2:
+    image: zookeeper_server:latest
+    ports:
+      - "50053:50053"
+    networks:
+      - mynetwork
+    command: bash -c "go run *.go"
+    tty: true
+    depends_on:
+    - server-0
+    environment:
+      - PORT=50053
+      - ID=2
+
+  server-3:
+    image: zookeeper_server:latest
+    ports:
+      - "50054:50054"
+    networks:
+      - mynetwork
+    command: bash -c "go run *.go"
+    tty: true
+    depends_on:
+    - server-0
+    environment:
+      - PORT=50054
+      - ID=3
+
+  server-4:
+    image: zookeeper_server:latest
+    ports:
+      - "50055:50055"
+    networks:
+      - mynetwork
+    command: bash -c "go run *.go"
+    tty: true
+    depends_on:
+    - server-0
+    environment:
+      - PORT=50055
+      - ID=4
+
+  server-5:
+    image: zookeeper_server:latest
+    ports:
+      - "50056:50056"
+    networks:
+      - mynetwork
+    command: bash -c "go run *.go"
+    tty: true
+    depends_on:
+    - server-0
+    environment:
+      - PORT=50056
+      - ID=5
 
   client:
     build: 
       context: .
       dockerfile: ./client/Dockerfile
-    container_name: client
+    image: zookeeper_client:latest
     ports:
       - "50057:50057"
     networks:
       - mynetwork
     tty: true
+    environment:
+      - ADDR=server-0:50051
 
 networks:
   mynetwork:

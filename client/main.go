@@ -253,7 +253,11 @@ func SendClientGrpc[T pb.Message, R pb.Message](
 	var r R
 
 	// Set up a connection to the server.
-	conn, err := grpc.Dial(*addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	docker_addr := os.Getenv("ADDR")
+
+	fmt.Printf("Client connect to Zookeeper Server at %d\n", docker_addr)
+
+	conn, err := grpc.Dial(docker_addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 	}
