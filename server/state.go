@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+	"log/slog"
 	mu "sync"
 
 	pb "github.com/shaunnope/go-jaguard/zouk"
@@ -38,6 +40,7 @@ func (s State) String() string {
 type ZabSession struct {
 	mu.Mutex
 	FollowerEpochs map[int]int
+	FollowerInfoQ  chan *pb.FollowerInfo
 	QuorumReady    chan bool
 	BroadcastReady chan bool
 	HasQuorum      bool
@@ -47,6 +50,7 @@ type ZabSession struct {
 func NewZabSession() ZabSession {
 	return ZabSession{
 		FollowerEpochs: make(map[int]int),
+		FollowerInfoQ:  make(chan *pb.FollowerInfo, 10),
 		QuorumReady:    make(chan bool),
 		BroadcastReady: make(chan bool),
 		HasQuorum:      false,
@@ -57,6 +61,7 @@ func NewZabSession() ZabSession {
 func (l *ZabSession) Reset() {
 	l.Lock()
 	defer l.Unlock()
+	slog.Info("Resetting zab session")
 	clear(l.FollowerEpochs)
 	l.QuorumReady = make(chan bool)
 	l.BroadcastReady = make(chan bool)
@@ -92,6 +97,9 @@ type StateVector struct {
 
 	// TODO: save data tree to non-volatile memory
 	Data *pb.DataTree
+
+	// path to memory
+	Path string
 }
 
 func NewStateVector(idx int) StateVector {
@@ -101,6 +109,7 @@ func NewStateVector(idx int) StateVector {
 		Connections: make(map[int]*pb.NodeClient),
 		Zab:         NewZabSession(),
 		Data:        pb.NewDataTree(),
+		Path:        fmt.Sprintf("%s/s%d", *logDir, idx),
 		Stop:        make(chan bool),
 		Reelect:     make(chan bool),
 		Vote: pb.VoteFragment{
@@ -117,6 +126,25 @@ func (sv *StateVector) SetState(state State) {
 	sv.Lock()
 	defer sv.Unlock()
 	sv.State = state
+}
+
+// State and Vote can only be modified in FLE with lock
+func (sv *StateVector) SetStateAndVote(state State, vote *Vote) {
+	sv.Lock()
+	defer sv.Unlock()
+	sv.State = state
+	if state == ELECTION {
+		if vote != nil {
+			panic("vote should be nil when setting ELECTION state")
+		}
+		sv.Round++
+	}
+	if vote == nil {
+		sv.Vote = Vote{LastZxid: sv.LastZxid, Id: sv.Id}
+	} else {
+		sv.Vote = *vote
+	}
+
 }
 
 func (sv *StateVector) GetState() State {
@@ -144,10 +172,8 @@ func (sv *StateVector) GetVote() Vote {
 }
 
 func (sv *StateVector) IncRound(atomic bool) int {
-	if atomic {
-		sv.Lock()
-		defer sv.Unlock()
-	}
+	sv.Lock()
+	defer sv.Unlock()
 	sv.Round++
 	return sv.Round
 }

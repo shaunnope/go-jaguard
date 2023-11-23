@@ -122,9 +122,7 @@ func (s *Server) FastElection(t0 int) Vote {
 	receivedVotes := make(Table)
 	outOfElection := make(Table)
 
-	s.State = ELECTION
-	s.SetVote(nil)
-	s.IncRound(false)
+	s.SetStateAndVote(ELECTION, nil)
 
 	fileName := fmt.Sprintf("server%d.txt", s.Id)
 	file, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
@@ -142,7 +140,7 @@ func (s *Server) FastElection(t0 int) Vote {
 	}
 	s.ElectBroadcast()
 
-	for s.State == ELECTION {
+	for s.GetState() == ELECTION {
 		var n VoteMsg
 		select {
 		case <-time.After(time.Duration(timeout) * time.Millisecond):
@@ -161,11 +159,11 @@ func (s *Server) FastElection(t0 int) Vote {
 				if int(n.Round) > s.Round {
 					s.Round = int(n.Round)
 					receivedVotes = make(map[int]*VoteLog)
+					var newVote *Vote = nil
 					if nVote.GreaterThan(Vote{LastZxid: s.LastZxid, Id: s.Id}) {
-						s.SetVote(&nVote)
-					} else {
-						s.SetVote(nil)
+						newVote = &nVote
 					}
+					s.SetVote(newVote)
 					s.ElectBroadcast()
 				} else if int(n.Round) == s.Round && nVote.GreaterThan(s.Vote) {
 					if *leader_verbo {

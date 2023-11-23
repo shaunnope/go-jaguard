@@ -22,71 +22,7 @@ func (s *Server) InformLeader(ctx context.Context, in *pb.FollowerInfo) (*pb.Pin
 		// only leader should receive follower info
 		return nil, errors.New("not leader")
 	}
-	slog.Info("FollowerInfo", "s", s.Id, "from", in.Id, "lastZxid", in.LastZxid.Extract())
-	s.Zab.Lock()
-	defer s.Zab.Unlock()
-	switch int(in.LastZxid.Counter) {
-	case -1:
-		// phase 1
-		if !s.Zab.HasQuorum {
-			// leader has not received quorum. update leader table
-			s.Zab.FollowerEpochs[int(in.Id)] = int(in.LastZxid.Epoch)
-
-			jsonData, err := json.MarshalIndent(s.Zab.FollowerEpochs, "", "  ")
-			if err != nil {
-				log.Fatalf("JSON Marshaling failed: %s", err)
-			}
-			fmt.Println(string(jsonData))
-
-			if len(s.Zab.FollowerEpochs) > len(config.Servers)/2 {
-				slog.Debug("Got quorum", "s", s.Id)
-				s.Zab.HasQuorum = true
-				s.Zab.QuorumReady <- true
-			}
-
-		} else {
-			// phase 3
-			go func() {
-				slog.Debug("Waiting for Broadcast", "s", s.Id, "from", in.Id)
-				s.WaitForBroadcast()
-				slog.Info("Broadcast ready", "s", s.Id, "from", in.Id)
-
-				s.Zab.Lock()
-				defer s.Zab.Unlock()
-				// send NEWEPOCH and NEWLEADER to new follower
-				SendGrpc[*pb.NewEpoch, *pb.AckEpoch](pb.NodeClient.ProposeEpoch, s, int(in.Id), &pb.NewEpoch{Epoch: int64(s.CurrentEpoch)}, *maxTimeout)
-
-				msg := &pb.NewLeader{Epoch: int64(s.LastZxid.Epoch), History: s.History.Raw()}
-				if r, err := SendGrpc[*pb.NewLeader, *pb.AckLeader](
-					pb.NodeClient.ProposeLeader,
-					s, int(in.Id), msg,
-					*maxTimeout); err == nil {
-					SendGrpc[*pb.ZabRequest, *pb.Ping](
-						pb.NodeClient.Commit,
-						s, int(in.Id), &pb.ZabRequest{},
-						*maxTimeout)
-					// update leader table
-					s.Zab.FollowerEpochs[int(in.Id)] = int(r.Epoch)
-				}
-
-			}()
-		}
-
-	default:
-		// follower recovery
-		// 1. Send NEWLEADER to follower
-		msg := &pb.NewLeader{LastZxid: s.LastZxid.Raw()}
-		if r, err := SendGrpc[*pb.NewLeader, *pb.AckLeader](
-			pb.NodeClient.ProposeLeader,
-			s, int(in.Id), msg,
-			*maxTimeout*3); err == nil {
-			// update leader table
-			s.Zab.FollowerEpochs[int(in.Id)] = int(r.Epoch)
-		}
-		// 2. Send one of SNAP, DIFF, TRUNC to follower
-		// TODO: will just send SNAP for now
-	}
-
+	s.Zab.FollowerInfoQ <- in
 	return &pb.Ping{Data: int64(s.CurrentEpoch)}, nil
 }
 
@@ -300,6 +236,77 @@ func (s *Server) HandleOperation(transaction pb.TransactionFragment) (string, er
 
 // end grpc calls
 
+// Handle Phase 1 FollowerInfo
+func (s *Server) ProcessFollowerInfo() {
+	for {
+		in := <-s.Zab.FollowerInfoQ
+		slog.Info("FollowerInfo", "s", s.Id, "from", in.Id, "lastZxid", in.LastZxid.Extract())
+		s.Zab.Lock()
+		switch int(in.LastZxid.Counter) {
+		case -1:
+			// phase 1
+			if !s.Zab.HasQuorum {
+				// leader has not received quorum. update leader table
+				s.Zab.FollowerEpochs[int(in.Id)] = int(in.LastZxid.Epoch)
+
+				jsonData, err := json.MarshalIndent(s.Zab.FollowerEpochs, "", "  ")
+				if err != nil {
+					log.Fatalf("JSON Marshaling failed: %s", err)
+				}
+				fmt.Println(string(jsonData))
+
+				if len(s.Zab.FollowerEpochs) > len(config.Servers)/2 {
+					slog.Debug("Got quorum", "s", s.Id)
+					s.Zab.HasQuorum = true
+					s.Zab.QuorumReady <- true
+				}
+
+			} else {
+				// phase 3
+				go func() {
+					slog.Debug("Waiting for Broadcast", "s", s.Id, "from", in.Id)
+					s.WaitForBroadcast()
+					slog.Info("Broadcast ready", "s", s.Id, "from", in.Id)
+
+					s.Zab.Lock()
+					defer s.Zab.Unlock()
+					// send NEWEPOCH and NEWLEADER to new follower
+					SendGrpc[*pb.NewEpoch, *pb.AckEpoch](pb.NodeClient.ProposeEpoch, s, int(in.Id), &pb.NewEpoch{Epoch: int64(s.CurrentEpoch)}, *maxTimeout)
+
+					msg := &pb.NewLeader{Epoch: int64(s.LastZxid.Epoch), History: s.History.Raw()}
+					if r, err := SendGrpc[*pb.NewLeader, *pb.AckLeader](
+						pb.NodeClient.ProposeLeader,
+						s, int(in.Id), msg,
+						*maxTimeout); err == nil {
+						SendGrpc[*pb.ZabRequest, *pb.Ping](
+							pb.NodeClient.Commit,
+							s, int(in.Id), &pb.ZabRequest{},
+							*maxTimeout)
+						// update leader table
+						s.Zab.FollowerEpochs[int(in.Id)] = int(r.Epoch)
+					}
+
+				}()
+			}
+
+		default:
+			// follower recovery
+			// 1. Send NEWLEADER to follower
+			msg := &pb.NewLeader{LastZxid: s.LastZxid.Raw()}
+			if r, err := SendGrpc[*pb.NewLeader, *pb.AckLeader](
+				pb.NodeClient.ProposeLeader,
+				s, int(in.Id), msg,
+				*maxTimeout*3); err == nil {
+				// update leader table
+				s.Zab.FollowerEpochs[int(in.Id)] = int(r.Epoch)
+			}
+			// 2. Send one of SNAP, DIFF, TRUNC to follower
+			// TODO: will just send SNAP for now
+		}
+		s.Zab.Unlock()
+	}
+}
+
 // Routine to start Zab Session
 func (s *Server) ZabStart(t0 int) error {
 	if vote := s.FastElection(t0); vote.Id == -1 {
@@ -354,6 +361,7 @@ func (s *Server) Discovery() {
 
 	case LEADING:
 		s.Zab.Reset()
+		go s.ProcessFollowerInfo()
 		<-s.Zab.QuorumReady
 		s.Zab.Lock()
 		maxEpoch := -1
