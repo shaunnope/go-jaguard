@@ -1,0 +1,28 @@
+{
+    "servers": [
+        {
+            "host": "server",
+            "port": 50051
+        },
+        {
+            "host": "server",
+            "port": 50052
+        },
+        {
+            "host": "server",
+            "port": 50053
+        },
+        {
+            "host": "server",
+            "port": 50054
+        },
+        {
+            "host": "server",
+            "port": 50055
+        },
+        {
+            "host": "server",
+            "port": 50056
+        }
+    ]
+}

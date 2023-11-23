@@ -1,0 +1,68 @@
+version: '3.8'
+services:
+  server1:
+    build: &id001
+      context: .
+      dockerfile: ./server/Dockerfile
+    networks: &id002
+    - mynetwork
+    command: &id003
+    - bash -c "go run *.go"
+    tty: &id004
+    - 'true'
+    ports:
+    - 50051:50051
+  server2:
+    build: *id001
+    networks: *id002
+    command: *id003
+    tty: *id004
+    ports:
+    - 50052:50052
+  server3:
+    build: *id001
+    networks: *id002
+    command: *id003
+    tty: *id004
+    ports:
+    - 50053:50053
+  server4:
+    build: *id001
+    networks: *id002
+    command: *id003
+    tty: *id004
+    ports:
+    - 50054:50054
+  server5:
+    build: *id001
+    networks: *id002
+    command: *id003
+    tty: *id004
+    ports:
+    - 50055:50055
+  server6:
+    build: *id001
+    networks: *id002
+    command: *id003
+    tty: *id004
+    ports:
+    - 50056:50056
+  client:
+    build:
+      context: .
+      dockerfile: ./client/Dockerfile
+    ports:
+    - 50057:50057
+    depends_on:
+    - server1
+    - server2
+    - server3
+    - server4
+    - server5
+    - server6
+    networks:
+    - mynetwork
+    environment:
+    - ADDR=server1:50051
+networks:
+  mynetwork: {}

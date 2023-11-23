@@ -1,0 +1,27 @@
+version: '3.8'
+services:
+  server:
+    build: 
+      context: .
+      dockerfile: ./server/Dockerfile
+    container_name: server
+    ports:
+      - "50051:50051"
+    networks:
+      - mynetwork
+    command: bash -c "go run *.go"
+    tty: true
+
+  client:
+    build: 
+      context: .
+      dockerfile: ./client/Dockerfile
+    container_name: client
+    ports:
+      - "50057:50057"
+    networks:
+      - mynetwork
+    tty: true
+
+networks:
+  mynetwork:
