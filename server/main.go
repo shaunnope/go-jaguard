@@ -13,6 +13,8 @@ var (
 	configPath = flag.String("config", "config.json", "path to config file")
 	config     Config
 
+	logDir = flag.String("log", "out", "path to log directory")
+
 	// idx = flag.Int("idx", 0, "server index")
 
 	maxTimeout = flag.Int("maxTimeout", 5000, "max timeout for election")

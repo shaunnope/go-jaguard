@@ -1,6 +1,11 @@
 package zouk
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+
+	"github.com/shaunnope/go-jaguard/utils"
+)
 
 // dataclass for zxid
 type ZxidFragment struct {
@@ -37,6 +42,22 @@ func (z ZxidFragment) Inc() ZxidFragment {
 // Convert to raw Zxid
 func (z ZxidFragment) Raw() *Zxid {
 	return &Zxid{Epoch: int64(z.Epoch), Counter: int64(z.Counter)}
+}
+
+func (z *ZxidFragment) Unmarshal(data []byte) error {
+	if len(data) != 16 {
+		return errors.New("invalid zxid length")
+	}
+	z.Epoch = utils.UnmarshalInt(data[0:8])
+	z.Counter = utils.UnmarshalInt(data[8:16])
+	return nil
+}
+
+func (z *ZxidFragment) Marshal() []byte {
+	data := make([]byte, 16)
+	copy(data[0:8], utils.MarshalInt(z.Epoch))
+	copy(data[8:16], utils.MarshalInt(z.Counter))
+	return data
 }
 
 type TransactionFragment struct {

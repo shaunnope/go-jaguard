@@ -13,7 +13,7 @@ func (s *Server) HandleClientCUDS(ctx context.Context, in *pb.CUDSRequest) (*pb.
 	// if follower, forward to leader, do nothing with response (rpc)
 	// if leader send proposal to all followers in for loop (rpc)
 	// since its rpc, leader will monitor for responses and decide whether to commit/announce
-	switch state := s.GetState(); state {
+	switch state := s.State; state {
 	case FOLLOWING:
 		slog.Debug("Client Forward", "s", s.Id, "to", s.Vote.Id, "request", in)
 		// TODO: verify version

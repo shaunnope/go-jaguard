@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	mu "sync"
 
+	"github.com/shaunnope/go-jaguard/utils"
 	pb "github.com/shaunnope/go-jaguard/zouk"
 )
 
@@ -93,9 +94,7 @@ type StateVector struct {
 	Reelect chan bool
 
 	// states related to Zab Session
-	Zab ZabSession
-
-	// TODO: save data tree to non-volatile memory
+	Zab  ZabSession
 	Data *pb.DataTree
 
 	// path to memory
@@ -109,7 +108,7 @@ func NewStateVector(idx int) StateVector {
 		Connections: make(map[int]*pb.NodeClient),
 		Zab:         NewZabSession(),
 		Data:        pb.NewDataTree(),
-		Path:        fmt.Sprintf("%s/s%d", *logDir, idx),
+		Path:        fmt.Sprintf("%s/s%d/", *logDir, idx),
 		Stop:        make(chan bool),
 		Reelect:     make(chan bool),
 		Vote: pb.VoteFragment{
@@ -122,17 +121,10 @@ func NewStateVector(idx int) StateVector {
 	}
 }
 
-func (sv *StateVector) SetState(state State) {
-	sv.Lock()
-	defer sv.Unlock()
-	sv.State = state
-}
-
 // State and Vote can only be modified in FLE with lock
 func (sv *StateVector) SetStateAndVote(state State, vote *Vote) {
 	sv.Lock()
 	defer sv.Unlock()
-	sv.State = state
 	if state == ELECTION {
 		if vote != nil {
 			panic("vote should be nil when setting ELECTION state")
@@ -140,8 +132,15 @@ func (sv *StateVector) SetStateAndVote(state State, vote *Vote) {
 		sv.Round++
 	}
 	if vote == nil {
-		sv.Vote = Vote{LastZxid: sv.LastZxid, Id: sv.Id}
+		vote = &Vote{LastZxid: sv.LastZxid, Id: sv.Id}
+	}
+	if err := sv.SaveState(data_STATE, vote.Marshal()); err != nil {
+		slog.Error("SetStateAndVote", "err", err)
 	} else {
+		if sv.State == LEADING && state != LEADING {
+			close(sv.Zab.Abort)
+		}
+		sv.State = state
 		sv.Vote = *vote
 	}
 
@@ -159,10 +158,10 @@ func (sv *StateVector) SetVote(vote *Vote) {
 	sv.Lock()
 	defer sv.Unlock()
 	if vote == nil {
-		sv.Vote = Vote{LastZxid: sv.LastZxid, Id: sv.Id}
-	} else {
-		sv.Vote = *vote
+		vote = &Vote{LastZxid: sv.LastZxid, Id: sv.Id}
 	}
+	sv.SaveState(data_STATE, vote.Marshal())
+	sv.Vote = *vote
 }
 
 func (sv *StateVector) GetVote() Vote {
@@ -176,4 +175,50 @@ func (sv *StateVector) IncRound(atomic bool) int {
 	defer sv.Unlock()
 	sv.Round++
 	return sv.Round
+}
+
+func (sv *StateVector) SetAcceptedEpoch(epoch int) {
+	data := make([]byte, 16)
+	copy(data[0:8], utils.MarshalInt(epoch))
+	copy(data[8:16], utils.MarshalInt(sv.CurrentEpoch))
+	if err := sv.SaveState(data_EPOCH, data); err != nil {
+		slog.Error("SetAcceptedEpoch", "err", err)
+	} else {
+		slog.Info("SetAcceptedEpoch", "epoch", epoch)
+		sv.AcceptedEpoch = epoch
+	}
+}
+
+func (sv *StateVector) SetEpochs(accepted *int, current *int) {
+	data := make([]byte, 16)
+	if accepted == nil {
+		accepted = &sv.AcceptedEpoch
+	}
+	if current == nil {
+		current = &sv.CurrentEpoch
+	}
+
+	copy(data[0:8], utils.MarshalInt(*accepted))
+	copy(data[8:16], utils.MarshalInt(*current))
+	if err := sv.SaveState(data_EPOCH, data); err != nil {
+		slog.Error("SetEpochs", "err", err)
+	} else {
+		slog.Info("SetEpochs", "a", *accepted, "c", *current)
+		sv.AcceptedEpoch = *accepted
+		sv.CurrentEpoch = *current
+	}
+}
+
+func (sv *StateVector) SetLastZxid(zxid pb.ZxidFragment) {
+	if err := sv.SaveState(data_ZXID, zxid.Marshal()); err != nil {
+		slog.Error("SetLastZxid", "err", err)
+	} else {
+		slog.Info("SetLastZxid", "zxid", zxid)
+		sv.LastZxid = zxid
+	}
+}
+
+func (sv *StateVector) ReplaceHistory(history []pb.TransactionFragment) {
+
+	sv.History.Set(history)
 }
