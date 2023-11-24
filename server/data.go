@@ -23,10 +23,12 @@ func (s *StateVector) LoadStates() error {
 
 	// load vote and state
 	if data, err := os.ReadFile(s.Path + data_STATE); err != nil {
-		slog.Error("LoadStates Vote", "err", err)
+		// slog.Error("LoadStates Vote", "err", err)
+		return err
 	} else {
 		if err := s.Vote.Unmarshal(data); err != nil {
-			slog.Error("LoadStates Vote", "err", err)
+			// slog.Error("LoadStates Vote", "err", err)
+			return err
 		}
 		if s.Vote.Id != s.Id {
 			s.State = FOLLOWING
@@ -37,10 +39,12 @@ func (s *StateVector) LoadStates() error {
 
 	// load epoch
 	if data, err := os.ReadFile(s.Path + data_EPOCH); err != nil {
-		slog.Error("LoadStates Epoch", "err", err)
+		// slog.Error("LoadStates Epoch", "err", err)
+		return err
 	} else {
 		if len(data) != 16 {
-			slog.Error("LoadStates Epoch", "err", "invalid epoch length")
+			// slog.Error("LoadStates Epoch", "err", "invalid epoch length")
+			return err
 		}
 		s.AcceptedEpoch = utils.UnmarshalInt(data[0:8])
 		s.CurrentEpoch = utils.UnmarshalInt(data[8:16])
@@ -48,18 +52,21 @@ func (s *StateVector) LoadStates() error {
 
 	// load zxid
 	if data, err := os.ReadFile(s.Path + data_ZXID); err != nil {
-		slog.Error("LoadStates Zxid", "err", err)
+		// slog.Error("LoadStates Zxid", "err", err)
+		return err
 	} else {
 		s.LastZxid.Unmarshal(data)
 	}
 
 	// load history
 	if err := os.MkdirAll(s.Path+data_HISTDIR, 0755); err != nil {
-		slog.Error("LoadStates History", "err", err)
+		// slog.Error("LoadStates History", "err", err)
+		return err
 	}
 	files, err := os.ReadDir(s.Path + data_HISTDIR)
 	if err != nil {
-		slog.Error("LoadStates History", "err", err)
+		// slog.Error	("LoadStates History", "err", err)
+		return err
 	}
 	for _, file := range files {
 		if file.IsDir() {

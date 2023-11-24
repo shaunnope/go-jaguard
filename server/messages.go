@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"log/slog"
 	"time"
 
 	pb "github.com/shaunnope/go-jaguard/zouk"
@@ -68,7 +69,8 @@ func TriggerWatch(watch *pb.Watch, operationType pb.OperationType) {
 	conn, err := grpc.Dial(callbackAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 
 	if err != nil {
-		fmt.Println("Couldnt connect to zkclient")
+		slog.Error("TriggerWatch", "err", err)
+		return
 	}
 	defer conn.Close()
 	client := pb.NewZkCallbackClient(conn)

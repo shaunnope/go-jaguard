@@ -110,7 +110,7 @@ func (s *Server) HandleClientCUDS(ctx context.Context, in *pb.CUDSRequest) (*pb.
 func (s *Server) GetExists(ctx context.Context, in *pb.GetExistsRequest) (*pb.GetExistsResponse, error) {
 	node, err := s.StateVector.Data.GetNode(in.Path)
 	if node == nil {
-		return &pb.GetExistsResponse{Exists: false, Zxid: s.LastZxid.Inc().Raw()}, err
+		return &pb.GetExistsResponse{Exists: false, Zxid: s.LastZxid.Inc().Raw()}, nil
 	}
 	if in.SetWatch {
 		s.StateVector.Data.AddWatchToNode(in.Path, &pb.Watch{

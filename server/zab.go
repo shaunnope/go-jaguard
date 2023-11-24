@@ -333,7 +333,9 @@ func (s *Server) ZabStart(t0 int) error {
 func (s *Server) ZabRecover() error {
 	s.Lock()
 	defer s.Unlock()
-	s.LoadStates()
+	if err := s.LoadStates(); err != nil {
+		return err
+	}
 
 	switch s.State {
 	case LEADING:

@@ -184,7 +184,7 @@ func (sv *StateVector) SetAcceptedEpoch(epoch int) {
 	if err := sv.SaveState(data_EPOCH, data); err != nil {
 		slog.Error("SetAcceptedEpoch", "err", err)
 	} else {
-		slog.Info("SetAcceptedEpoch", "epoch", epoch)
+		slog.Debug("SetAcceptedEpoch", "epoch", epoch)
 		sv.AcceptedEpoch = epoch
 	}
 }
@@ -213,7 +213,7 @@ func (sv *StateVector) SetLastZxid(zxid pb.ZxidFragment) {
 	if err := sv.SaveState(data_ZXID, zxid.Marshal()); err != nil {
 		slog.Error("SetLastZxid", "err", err)
 	} else {
-		slog.Info("SetLastZxid", "zxid", zxid)
+		slog.Debug("SetLastZxid", "zxid", zxid)
 		sv.LastZxid = zxid
 	}
 }
