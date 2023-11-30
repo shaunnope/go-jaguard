@@ -96,7 +96,12 @@ services:
       - mynetwork
     tty: true
     environment:
-      - ADDR=server-0:50051
+      - SERVER_0_ADDR=server-0:50051
+      - SERVER_1_ADDR=server-1:50052
+      - SERVER_2_ADDR=server-2:50053
+      - SERVER_3_ADDR=server-3:50054
+      - SERVER_4_ADDR=server-4:50055
+      - SERVER_5_ADDR=server-5:50056
 
 networks:
   mynetwork:

@@ -253,7 +253,7 @@ func SendClientGrpc[T pb.Message, R pb.Message](
 	var r R
 
 	// Set up a connection to the server.
-	docker_addr := os.Getenv("ADDR")
+	docker_addr := os.Getenv("SERVER_0_ADDR")
 
 	fmt.Printf("Client connect to Zookeeper Server at %d\n", docker_addr)
 
