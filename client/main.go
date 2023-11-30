@@ -19,7 +19,7 @@ import (
 
 var (
 	// flags
-	port       = flag.Int("port", 50057, "server port")
+	port       = flag.Int("port", 50000, "server port")
 	addr       = flag.String("addr", "localhost:50051", "the address to connect to")
 	maxTimeout = flag.Int("maxTimeout", 100000, "max timeout for election")
 )
@@ -69,7 +69,6 @@ func parseReadCommand(command []string) (string, bool, error) {
 func menu() {
 	input := bufio.NewScanner(os.Stdin)
 	listHelp()
-	// Loop:
 	fmt.Print("Enter your command: ")
 Loop:
 	for input.Scan() {
@@ -190,7 +189,7 @@ Loop:
 			}
 
 		case "delete":
-			fmt.Printf("Executing set: %s\n", &command)
+			fmt.Printf("Executing delete: %s\n", &command)
 
 			if len(command) < 2 {
 				fmt.Println("not enough arguments for 'delete' command")
@@ -206,6 +205,7 @@ Loop:
 			} else {
 				fmt.Printf("DELETE: %s is accepted: %t\n", path, *deleteRequest.Accept)
 			}
+
 		case "sync":
 			syncRequest, err := SendClientGrpc[*pb.CUDSRequest, *pb.CUDSResponse](pb.NodeClient.HandleClientCUDS, &pb.CUDSRequest{Path: "", Flags: &pb.Flag{IsSequential: false, IsEphemeral: false}, OperationType: pb.OperationType_SYNC}, *maxTimeout)
 			if err != nil {
@@ -213,6 +213,7 @@ Loop:
 			} else {
 				fmt.Printf("SYNC: Accepted: %t\n", *syncRequest.Accept)
 			}
+
 		case "q":
 			fmt.Println("Quiting...")
 			break Loop
@@ -220,6 +221,7 @@ Loop:
 			fmt.Println("INVALID COMMAND ...")
 			listHelp()
 		}
+		fmt.Print("Enter your command: ")
 	}
 }
 

@@ -73,6 +73,7 @@ message NewLeader {
 
 message AckLeader {
     int64 epoch = 1;
+    repeated Transaction history = 2;
 }
 
 // end zab
@@ -86,6 +87,7 @@ message ZabRequest {
 
 message ZabAck {
     ZabRequest request = 1;
+    bool accept = 2;
 }
 
 enum RequestType{
@@ -156,6 +158,7 @@ service Node {
     rpc InformLeader (FollowerInfo) returns (Ping);
     rpc ProposeEpoch (NewEpoch) returns (AckEpoch);
     rpc ProposeLeader (NewLeader) returns (AckLeader);
+    rpc Commit (ZabRequest) returns (Ping);
 
     rpc SendZabRequest (ZabRequest) returns (ZabAck);
     

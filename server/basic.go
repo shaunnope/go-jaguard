@@ -12,18 +12,10 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-// Manual setup of server states
-func (s *Server) Setup(vote pb.VoteFragment) {
+// Setup of server connections
+func (s *Server) Setup() {
 	s.Lock()
 	defer s.Unlock()
-	s.Vote = vote
-	if s.Id == vote.Id {
-		s.State = LEADING
-		log.Printf("server %d is leader", s.Id)
-	} else {
-		s.State = FOLLOWING
-		log.Printf("server %d is following %v", s.Id, s.Vote)
-	}
 
 	for idx := range config.Servers {
 		if idx == s.Id {

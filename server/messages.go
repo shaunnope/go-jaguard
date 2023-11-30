@@ -3,12 +3,36 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
+	"log/slog"
+	"time"
 
-	"github.com/shaunnope/go-jaguard/zouk"
 	pb "github.com/shaunnope/go-jaguard/zouk"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
+
+type ContextKey string
+
+// Establish connection to another server if it does not already exist. Returns a context and cancel function
+func (s *Server) EstablishConnection(to int, timeout int) (context.Context, context.CancelFunc) {
+	if to == s.Id {
+		return nil, nil
+	}
+	if _, ok := s.Connections[to]; !ok {
+		addr := fmt.Sprintf("%s:%d", config.Servers[to].Host, config.Servers[to].Port)
+		conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if err != nil {
+			log.Fatalf("%d failed to connect to %d: %v", s.Id, to, err)
+		}
+		c := pb.NewNodeClient(conn)
+		s.Connections[to] = &c
+	}
+	ctx := context.WithValue(context.Background(), ContextKey("from"), s.Id)
+
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(timeout)*time.Millisecond)
+	return ctx, cancel
+}
 
 // Perform a gRPC call to another server
 //
@@ -40,13 +64,14 @@ func SendGrpc[T pb.Message, R pb.Message](
 	return r, nil
 }
 
-func TriggerWatch(watch *zouk.Watch, operationType pb.OperationType) {
+func TriggerWatch(watch *pb.Watch, operationType pb.OperationType) {
 	fmt.Printf("Sending watch gRPC call\n")
 	callbackAddr := fmt.Sprintf("%s:%s", watch.ClientAddr.Host, watch.ClientAddr.Port)
 	conn, err := grpc.Dial(callbackAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 
 	if err != nil {
-		fmt.Println("Couldnt connect to zkclient")
+		slog.Error("TriggerWatch", "err", err)
+		return
 	}
 	defer conn.Close()
 	client := pb.NewZkCallbackClient(conn)

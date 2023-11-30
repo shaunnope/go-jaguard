@@ -1,19 +1,42 @@
 package main
 
 import (
-	"log"
+	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
 	pb "github.com/shaunnope/go-jaguard/zouk"
 )
 
+func (s *Server) ReelectListener() {
+	for {
+		select {
+		case _, ok := <-s.Stop:
+			if ok {
+				panic(fmt.Sprintf("%d: unexpected data on Stop", s.Id))
+			}
+			return
+		case <-s.Reelect:
+			if vote := s.FastElection(*maxTimeout); vote.Id == -1 {
+				slog.Error("Election failed", "s", s.Id)
+				s.Stop <- true
+				return
+			}
+		}
+	}
+}
+
 func (s *Server) Heartbeat() {
+	if s.State == DOWN {
+		return
+	}
 
 	// trigger shutdown
 	// defer func() {
-	// 	s.Stop <- true
+	// 	close(s.Stop)
 	// }()
+	go s.ReelectListener()
 
 	for {
 		// TODO: consider if concurrent state reads are safe
@@ -41,11 +64,9 @@ func (s *Server) Heartbeat() {
 			// check for failed nodes
 			wg.Wait()
 			if len(failed) > len(config.Servers)/2 {
-				log.Printf("%d lost quorum", s.Id)
-				s.FastElection(*maxTimeout)
+				slog.Info("Lost quorum", "s", s.Id, "failed", failed)
+				s.Reelect <- true
 				return
-				// } else {
-				// 	log.Printf("%d has quorum", s.Id)
 			}
 
 		case FOLLOWING:
@@ -59,15 +80,13 @@ func (s *Server) Heartbeat() {
 			// Send heartbeat to leader
 			_, err := SendGrpc[*pb.Ping, *pb.Ping](pb.NodeClient.SendPing, s, s.Vote.Id, &pb.Ping{Data: int64(s.Id)}, *maxTimeout)
 			if err != nil {
-				log.Printf("%d lost leader", s.Id)
-				s.FastElection(*maxTimeout)
+				slog.Info("Lost leader", "s", s.Id, "leader", s.Vote)
+				s.Reelect <- true
 				return
-				// } else {
-				// 	log.Printf("%d has leader", s.Id)
 			}
 
 		}
-
+		slog.Debug("Heartbeat", "s", s.Id, "state", s.State, "vote", s.Vote)
 		time.Sleep(time.Duration(*maxTimeout) * time.Millisecond)
 	}
 }
