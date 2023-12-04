@@ -20,6 +20,7 @@ import (
 func (s *Server) InformLeader(ctx context.Context, in *pb.FollowerInfo) (*pb.Ping, error) {
 	if s.State != LEADING {
 		// only leader should receive follower info
+		s.Reelect <- true
 		return nil, errors.New("not leader")
 	}
 	s.Zab.FollowerInfoQ <- in
@@ -234,7 +235,7 @@ func (s *Server) HandleOperation(transaction pb.TransactionFragment) (string, er
 
 // end grpc calls
 
-// Handle Phase 1 FollowerInfo
+// Async listener to handle Phase 1 FollowerInfo
 func (s *Server) ProcessFollowerInfo() {
 	for {
 		select {

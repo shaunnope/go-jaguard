@@ -48,18 +48,24 @@ func (s *Server) Serve(grpc_s *grpc.Server) {
 }
 
 func Run(idx int) {
-	port, err := strconv.Atoi(os.Getenv("PORT"))
-	if err != nil {
-		log.Fatalf("failed to get PORT from environment: %v", err)
-	}
+	var lis net.Listener
+	var err error
+	if *run_locally {
+		addr := config.Servers[idx]
+		lis, err = net.Listen("tcp", fmt.Sprintf(":%d", addr.Port))
+		if err != nil {
+			log.Fatalf("failed to listen: %v", err)
+		}
+	} else {
+		port, err := strconv.Atoi(os.Getenv("PORT"))
+		if err != nil {
+			log.Fatalf("failed to get PORT from environment: %v", err)
+		}
 
-	fmt.Printf("Starting server on port %d\n", port)
-
-	// addr := config.Servers[idx]
-	// lis, err := net.Listen("tcp", fmt.Sprintf(":%d", addr.Port))
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
-	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
+		lis, err = net.Listen("tcp", fmt.Sprintf(":%d", port))
+		if err != nil {
+			log.Fatalf("failed to listen: %v", err)
+		}
 	}
 	grpc_s := grpc.NewServer()
 	// Server Object that handles gRPC requests
@@ -70,7 +76,7 @@ func Run(idx int) {
 	// Run fast election then maintain heartbeat
 	go node.Serve(grpc_s)
 
-	Checkpoint2(idx, node)
+	// Checkpoint2(idx, node)
 
 	if *call_watch {
 		fmt.Printf("Test watch\n")

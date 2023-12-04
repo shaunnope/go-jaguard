@@ -20,7 +20,6 @@ import (
 var (
 	// flags
 	port       = flag.Int("port", 50000, "server port")
-	addr       = flag.String("addr", "localhost:50051", "the address to connect to")
 	maxTimeout = flag.Int("maxTimeout", 100000, "max timeout for election")
 )
 
@@ -87,9 +86,10 @@ Loop:
 
 			getChildrenReply, err := SendClientGrpc[*pb.GetChildrenRequest, *pb.GetChildrenResponse](pb.NodeClient.GetChildren, &pb.GetChildrenRequest{Path: path, SetWatch: setWatch, ClientHost: host, ClientPort: strconv.Itoa(*port)}, *maxTimeout)
 
-			fmt.Printf("READ: %s has children: %s\n", path, getChildrenReply.Children)
 			if err != nil {
 				log.Printf("Error sending read request\n")
+			} else {
+				fmt.Printf("READ: %s has children: %s\n", path, getChildrenReply.Children)
 			}
 
 		case "get":
@@ -255,14 +255,17 @@ func SendClientGrpc[T pb.Message, R pb.Message](
 	var r R
 
 	// Set up a connection to the server.
-	docker_addr := os.Getenv("ADDR")
-
-	fmt.Printf("Client connect to Zookeeper Server at %d\n", docker_addr)
+	docker_addr, ok := os.LookupEnv("ADDR")
+	if !ok {
+		docker_addr = "localhost:50051"
+	}
 
 	conn, err := grpc.Dial(docker_addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 	}
+	fmt.Printf("CONNECTED: %s\n", docker_addr)
+
 	defer conn.Close()
 	c := pb.NewNodeClient(conn)
 

@@ -9,6 +9,7 @@ import (
 
 type Client struct {
 	pb.UnimplementedZkCallbackServer
+	Conn *pb.ZkCallbackClient
 }
 
 func (c *Client) NotifyWatchTrigger(ctx context.Context, in *pb.WatchNotification) (*pb.WatchNotificationResponse, error) {
