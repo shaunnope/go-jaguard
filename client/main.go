@@ -20,8 +20,10 @@ import (
 var (
 	// flags
 	port       = flag.Int("port", 50000, "server port")
-	addr       = flag.String("addr", "localhost:50051", "the address to connect to")
+	addr       = flag.String("addr", "localhost:50052", "the address to connect to")
 	maxTimeout = flag.Int("maxTimeout", 100000, "max timeout for election")
+
+	isRunningLocally = flag.Bool("l", false, "Set to true if running locally")
 )
 
 const (
@@ -161,12 +163,12 @@ Loop:
 				}
 
 			}
-			createRequest, err := SendClientGrpc[*pb.CUDSRequest, *pb.CUDSResponse](pb.NodeClient.HandleClientCUDS, &pb.CUDSRequest{Path: path, Data: []byte(data), Flags: &pb.Flag{IsSequential: setSequential, IsEphemeral: setEphemeral}, OperationType: pb.OperationType_WRITE}, *maxTimeout)
+			CUDSResponse, err := SendClientGrpc[*pb.CUDSRequest, *pb.CUDSResponse](pb.NodeClient.HandleClientCUDS, &pb.CUDSRequest{Path: path, Data: []byte(data), Flags: &pb.Flag{IsSequential: setSequential, IsEphemeral: setEphemeral}, OperationType: pb.OperationType_WRITE}, *maxTimeout)
 
 			if err != nil {
 				log.Printf("Error sending create request: %s\n", err)
 			} else {
-				fmt.Printf("WRITE: %s is accepted: %t\n", path, *createRequest.Accept)
+				fmt.Printf("WRITE: %s is accepted: %t, path: %s\n", path, *CUDSResponse.Accept, *CUDResponse.Path)
 			}
 
 		case "set":
@@ -180,12 +182,12 @@ Loop:
 			path := command[1]
 			data := command[2]
 
-			setRequest, err := SendClientGrpc[*pb.CUDSRequest, *pb.CUDSResponse](pb.NodeClient.HandleClientCUDS, &pb.CUDSRequest{Path: path, Data: []byte(data), Flags: &pb.Flag{IsSequential: false, IsEphemeral: false}, OperationType: pb.OperationType_UPDATE}, *maxTimeout)
+			CUDSResponse, err := SendClientGrpc[*pb.CUDSRequest, *pb.CUDSResponse](pb.NodeClient.HandleClientCUDS, &pb.CUDSRequest{Path: path, Data: []byte(data), Flags: &pb.Flag{IsSequential: false, IsEphemeral: false}, OperationType: pb.OperationType_UPDATE}, *maxTimeout)
 
 			if err != nil {
 				log.Printf("Error sending set request: %s\n", err)
 			} else {
-				fmt.Printf("SET: %s is accepted: %t\n", path, *setRequest.Accept)
+				fmt.Printf("SET: %s is accepted: %t\n", path, *CUDSResponse.Accept)
 			}
 
 		case "delete":
@@ -198,20 +200,20 @@ Loop:
 
 			path := command[1]
 
-			deleteRequest, err := SendClientGrpc[*pb.CUDSRequest, *pb.CUDSResponse](pb.NodeClient.HandleClientCUDS, &pb.CUDSRequest{Path: path, Flags: &pb.Flag{IsSequential: false, IsEphemeral: false}, OperationType: pb.OperationType_DELETE}, *maxTimeout)
+			CUDSResponse, err := SendClientGrpc[*pb.CUDSRequest, *pb.CUDSResponse](pb.NodeClient.HandleClientCUDS, &pb.CUDSRequest{Path: path, Flags: &pb.Flag{IsSequential: false, IsEphemeral: false}, OperationType: pb.OperationType_DELETE}, *maxTimeout)
 
 			if err != nil {
 				log.Printf("Error sending delete request: %s\n", err)
 			} else {
-				fmt.Printf("DELETE: %s is accepted: %t\n", path, *deleteRequest.Accept)
+				fmt.Printf("DELETE: %s is accepted: %t\n", path, *CUDSResponse.Accept)
 			}
 
 		case "sync":
-			syncRequest, err := SendClientGrpc[*pb.CUDSRequest, *pb.CUDSResponse](pb.NodeClient.HandleClientCUDS, &pb.CUDSRequest{Path: "", Flags: &pb.Flag{IsSequential: false, IsEphemeral: false}, OperationType: pb.OperationType_SYNC}, *maxTimeout)
+			CUDSResponse, err := SendClientGrpc[*pb.CUDSRequest, *pb.CUDSResponse](pb.NodeClient.HandleClientCUDS, &pb.CUDSRequest{Path: "", Flags: &pb.Flag{IsSequential: false, IsEphemeral: false}, OperationType: pb.OperationType_SYNC}, *maxTimeout)
 			if err != nil {
 				log.Printf("Error sending sync request: %s\n", err)
 			} else {
-				fmt.Printf("SYNC: Accepted: %t\n", *syncRequest.Accept)
+				fmt.Printf("SYNC: Accepted: %t\n", *CUDSResponse.Accept)
 			}
 
 		case "q":
@@ -232,7 +234,6 @@ func main() {
 
 	// handle watch callbacks
 	// setup zkcallback server
-	//TODO: Put this is some config file?
 	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", *port))
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
@@ -256,6 +257,9 @@ func SendClientGrpc[T pb.Message, R pb.Message](
 
 	// Set up a connection to the server.
 	docker_addr := os.Getenv("ADDR")
+	if *isRunningLocally == true {
+		docker_addr = *addr
+	}
 
 	fmt.Printf("Client connect to Zookeeper Server at %d\n", docker_addr)
 

@@ -168,7 +168,9 @@ func (s *Server) SendZabRequest(ctx context.Context, in *pb.ZabRequest) (*pb.Zab
 					TriggerWatch(watchesTriggered[i], transaction.Type)
 				}
 			}
-			if err := s.ZabDeliver(transaction); err != nil {
+			path, err := s.ZabDeliver(transaction)
+			in.GetTransaction().Path = path
+			if err != nil {
 				slog.Error("ZabDeliver", "s", s.Id, "err", "failed to deliver", "txn", transaction)
 				return nil, err
 
@@ -189,8 +191,7 @@ func (s *Server) SendZabRequest(ctx context.Context, in *pb.ZabRequest) (*pb.Zab
 func (s *Server) HandleOperation(transaction pb.TransactionFragment) (string, error) {
 	switch transaction.Type {
 	case pb.OperationType_WRITE:
-		//ephemeral owner??
-		_, err := s.Data.CreateNode(transaction.Path, transaction.Data, transaction.Flags.IsEphemeral, 1, transaction.Zxid, transaction.Flags.IsSequential)
+		path, err := s.Data.CreateNode(transaction.Path, transaction.Data, transaction.Flags.IsEphemeral, 1, transaction.Zxid, transaction.Flags.IsSequential)
 		if err != nil {
 			log.Println(err)
 			fmt.Println("Error:", err)
@@ -210,7 +211,7 @@ func (s *Server) HandleOperation(transaction pb.TransactionFragment) (string, er
 		fmt.Fprintf(file, "%s Updated Tree\n", currentTime)
 		printTree(s.StateVector.Data, file, "/", "")
 		fmt.Fprintln(file, "")
-		return "Success", nil
+		return path, nil
 
 	case pb.OperationType_UPDATE:
 		//Check node exists? Done here or in add into setdata method?
@@ -218,7 +219,7 @@ func (s *Server) HandleOperation(transaction pb.TransactionFragment) (string, er
 		//Version??
 		s.StateVector.Data.SetData(transaction.Path, transaction.Data, 0, transaction.Zxid)
 		log.Printf("node at %s updated", transaction.Path)
-		return "Success", nil
+		return transaction.Path, nil
 
 	case pb.OperationType_DELETE:
 		outcome, err := s.StateVector.Data.DeleteNode(transaction.Path, transaction.Zxid.Raw().Counter)
@@ -227,7 +228,7 @@ func (s *Server) HandleOperation(transaction pb.TransactionFragment) (string, er
 			return "", err
 		}
 		log.Println(outcome)
-		return "Success", nil
+		return transaction.Path, nil
 	}
 	return "", &json.UnsupportedValueError{Str: "Unsupported pb.OperationType"}
 }
@@ -472,10 +473,11 @@ func (s *Server) WaitForBroadcast() {
 // Commit a transaction locally.
 //
 // Note: This should be run synchronously
-func (s *Server) ZabDeliver(t pb.TransactionFragment) error {
+func (s *Server) ZabDeliver(t pb.TransactionFragment) (string, error) {
 	// TODO: non-volatile memory
-	if _, err := s.HandleOperation(t); err != nil {
-		return err
+	path, err := s.HandleOperation(t)
+	if err != nil {
+		return "", err
 	}
 
 	t.Committed = true
@@ -483,7 +485,7 @@ func (s *Server) ZabDeliver(t pb.TransactionFragment) error {
 	s.SetLastZxid(t.Zxid)
 	slog.Info("Commit", "s", s.Id, "txn", t)
 
-	return nil
+	return path, nil
 }
 
 // Commit all outstanding transactions

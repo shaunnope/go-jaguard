@@ -47,8 +47,16 @@ func (s *Server) Serve(grpc_s *grpc.Server) {
 	grpc_s.GracefulStop()
 }
 
-func Run(idx int) {
-	port, err := strconv.Atoi(os.Getenv("PORT"))
+func Run(idx int, isLocal bool) {
+	var port int
+	var err error
+	if isLocal {
+		port = config.Servers[idx].Port
+		err = nil
+	} else {
+		port, err = strconv.Atoi(os.Getenv("PORT"))
+	}
+
 	if err != nil {
 		log.Fatalf("failed to get PORT from environment: %v", err)
 	}

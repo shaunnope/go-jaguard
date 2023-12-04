@@ -139,6 +139,7 @@ message CUDSRequest {
 
 message CUDSResponse {
     optional bool accept = 1;
+    optional string path = 2;
 }
 
 message WatchNotification {

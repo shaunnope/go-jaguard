@@ -77,7 +77,7 @@ func (s *Server) HandleClientCUDS(ctx context.Context, in *pb.CUDSRequest) (*pb.
 			if transaction.Type == pb.OperationType_UPDATE {
 				fmt.Printf("Transaction's Data update with %s", transaction.Data)
 			}
-			err = s.ZabDeliver(msg.Transaction.Extract())
+			in.Path, err = s.ZabDeliver(msg.Transaction.Extract())
 			if in.OperationType == pb.OperationType_WRITE {
 				transactionFrag := msg.Transaction.ExtractLog()
 				watchesTriggered := s.Data.CheckWatchTrigger(&transactionFrag)
@@ -98,11 +98,11 @@ func (s *Server) HandleClientCUDS(ctx context.Context, in *pb.CUDSRequest) (*pb.
 
 		accepted := true
 		// commit
-		return &pb.CUDSResponse{Accept: &accepted}, err
+		return &pb.CUDSResponse{Accept: &accepted, Path: &in.Path}, err
 	default:
 		log.Printf("server %d is in %s state", s.Id, state)
 		accepted := false
-		return &pb.CUDSResponse{Accept: &accepted}, nil
+		return &pb.CUDSResponse{Accept: &accepted, Path: &in.Path}, nil
 	}
 
 }
