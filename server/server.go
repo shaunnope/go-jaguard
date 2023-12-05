@@ -8,7 +8,6 @@ import (
 	"net"
 	"os"
 	"strconv"
-	"time"
 
 	pb "github.com/shaunnope/go-jaguard/zouk"
 	"google.golang.org/grpc"
@@ -33,7 +32,7 @@ func (s *Server) SendPing(ctx context.Context, in *pb.Ping) (*pb.Ping, error) {
 //
 // Use reference to grpc server to stop it
 func (s *Server) Serve(grpc_s *grpc.Server) {
-	time.Sleep(time.Duration(10000) * time.Millisecond)
+	// time.Sleep(time.Duration(10000) * time.Millisecond)
 	if *leader_verbo {
 		log.Printf("%d begin election ", s.Id)
 	}

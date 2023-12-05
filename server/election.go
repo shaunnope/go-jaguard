@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	maxElectionTimeout float64 = 10000
+	maxElectionTimeout float64 = 100000
 )
 
 type Table map[int]*VoteLog

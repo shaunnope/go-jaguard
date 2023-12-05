@@ -75,5 +75,8 @@ func TriggerWatch(watch *pb.Watch, operationType pb.OperationType) {
 	}
 	defer conn.Close()
 	client := pb.NewZkCallbackClient(conn)
-	client.NotifyWatchTrigger(context.Background(), &pb.WatchNotification{Path: watch.Path, OperationType: operationType})
+	_, err = client.NotifyWatchTrigger(context.Background(), &pb.WatchNotification{Path: watch.Path, OperationType: operationType})
+	if err != nil {
+		slog.Error("TriggerWatch", "err", err)
+	}
 }

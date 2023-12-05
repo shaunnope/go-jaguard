@@ -103,7 +103,7 @@ Loop:
 
 			getData, err := SendClientGrpc[*pb.GetDataRequest, *pb.GetDataResponse](pb.NodeClient.GetData, &pb.GetDataRequest{Path: path, SetWatch: setWatch, ClientHost: host, ClientPort: strconv.Itoa(*port)}, *maxTimeout)
 
-			fmt.Printf("READ: %s has data:%b\n", path, getData.Data)
+			fmt.Printf("READ: %s %b\n", path, getData.Data)
 			if err != nil {
 				log.Printf("Error sending read request\n")
 			}

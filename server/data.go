@@ -39,11 +39,9 @@ func (s *StateVector) LoadStates() error {
 
 	// load epoch
 	if data, err := os.ReadFile(s.Path + data_EPOCH); err != nil {
-		// slog.Error("LoadStates Epoch", "err", err)
 		return err
 	} else {
 		if len(data) != 16 {
-			// slog.Error("LoadStates Epoch", "err", "invalid epoch length")
 			return err
 		}
 		s.AcceptedEpoch = utils.UnmarshalInt(data[0:8])
