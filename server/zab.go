@@ -169,7 +169,7 @@ func (s *Server) SendZabRequest(ctx context.Context, in *pb.ZabRequest) (*pb.Zab
 				}
 			}
 			path, err := s.ZabDeliver(transaction)
-			in.GetTransaction().Path = path
+			transaction.Path = path
 			if err != nil {
 				slog.Error("ZabDeliver", "s", s.Id, "err", "failed to deliver", "txn", transaction)
 				return nil, err

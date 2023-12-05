@@ -70,7 +70,7 @@ type TransactionFragment struct {
 }
 
 func (t TransactionFragment) String() string {
-	return fmt.Sprintf("{%d %d} %s @ %s %v", t.Zxid.Epoch, t.Zxid.Counter, t.Type, t.Path, t.Data)
+	return fmt.Sprintf("{%d %d} %s @ %s %v with flag %v", t.Zxid.Epoch, t.Zxid.Counter, t.Type, t.Path, t.Data, t.Flags)
 }
 
 type TransactionFragments struct {
@@ -135,7 +135,7 @@ func (t *Transaction) ExtractLog() TransactionFragment {
 }
 
 func (t *Transaction) LogString() string {
-	return fmt.Sprintf("Zxid: %v %s @ PATH: %s", t.Zxid.Extract(), t.Type, t.Path)
+	return fmt.Sprintf("Zxid: %v %s @ PATH: %s with Flag: %s", t.Zxid.Extract(), t.Type, t.Path, t.Flags)
 }
 
 func (t *Transaction) WithZxid(z ZxidFragment) *Transaction {

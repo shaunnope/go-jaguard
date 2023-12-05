@@ -20,7 +20,7 @@ import (
 var (
 	// flags
 	port       = flag.Int("port", 50000, "server port")
-	addr       = flag.String("addr", "localhost:50052", "the address to connect to")
+	joinAddr   = flag.String("addr", "localhost:50056", "the address to connect to")
 	maxTimeout = flag.Int("maxTimeout", 100000, "max timeout for election")
 
 	isRunningLocally = flag.Bool("l", false, "Set to true if running locally")
@@ -168,7 +168,7 @@ Loop:
 			if err != nil {
 				log.Printf("Error sending create request: %s\n", err)
 			} else {
-				fmt.Printf("WRITE: %s is accepted: %t, path: %s\n", path, *CUDSResponse.Accept, *CUDResponse.Path)
+				fmt.Printf("WRITE: %s is accepted: %t, path: %s\n", path, *CUDSResponse.Accept, *CUDSResponse.Path)
 			}
 
 		case "set":
@@ -258,7 +258,7 @@ func SendClientGrpc[T pb.Message, R pb.Message](
 	// Set up a connection to the server.
 	docker_addr := os.Getenv("ADDR")
 	if *isRunningLocally == true {
-		docker_addr = *addr
+		docker_addr = *joinAddr
 	}
 
 	fmt.Printf("Client connect to Zookeeper Server at %d\n", docker_addr)

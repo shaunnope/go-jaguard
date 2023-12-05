@@ -180,8 +180,8 @@ func (dataTree *DataTree) CheckWatchTrigger(transactionFragment *TransactionFrag
 
 	// Function to remove triggered watches
 	removeTriggeredWatches := func(watches []*Watch, watchType WatchType) ([]*Watch, []*Watch) {
-		var remainingWatches []*Watch
-		var triggeredWatches []*Watch
+		remainingWatches := []*Watch{}
+		triggeredWatches := []*Watch{}
 
 		// Iterate over watches and filter triggered and remaining watches
 		for _, watch := range watches {
@@ -195,9 +195,9 @@ func (dataTree *DataTree) CheckWatchTrigger(transactionFragment *TransactionFrag
 		return remainingWatches, triggeredWatches
 	}
 
-	var remainingWatches []*Watch
-	var triggeredWatches []*Watch
-	var triggered []*Watch
+	remainingWatches := []*Watch{}
+	triggeredWatches := []*Watch{}
+	triggered := []*Watch{}
 
 	switch transactionFragment.Type {
 	case OperationType_WRITE, OperationType_DELETE, OperationType_UPDATE:
