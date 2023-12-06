@@ -76,8 +76,6 @@ func (dataTree *DataTree) CreateNode(path string, data []byte, isEph bool, epher
 	childNode := NewNode(stat, parentName, data, isEph, path, isSequence)
 	parentNode.AddChild(childName)
 	dataTree.NodeMap[path] = &childNode
-	// fmt.Printf("Inside CreateNode, parentName:%s, childName:%s, data: %d\n", parentName, childName, data)
-
 	return path, nil
 }
 
