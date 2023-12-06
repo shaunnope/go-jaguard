@@ -23,6 +23,10 @@
         {
             "host": "localhost",
             "port": 50056
+        },
+        {
+            "host": "localhost",
+            "port": 50057
         }
     ]
 }

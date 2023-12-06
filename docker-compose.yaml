@@ -85,13 +85,27 @@ services:
       - PORT=50056
       - ID=5
 
+  server-6:
+    image: zookeeper_server:latest
+    ports:
+      - "50056:50057"
+    networks:
+      - mynetwork
+    command: bash -c "go run *.go"
+    tty: true
+    depends_on:
+    - server-0
+    environment:
+      - PORT=50057
+      - ID=6
+
   client:
     build: 
       context: .
       dockerfile: ./client/Dockerfile
     image: zookeeper_client:latest
     ports:
-      - "50057:50057"
+      - "50050:50050"
     networks:
       - mynetwork
     tty: true
