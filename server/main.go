@@ -26,7 +26,10 @@ var (
 	call_watch   = flag.Bool("call_watch", false, "Set to true if flag is present")
 )
 
-const version string = "0.0.2"
+const (
+	version    string = "0.0.2"
+	maxRetries int    = 5
+)
 
 func parseConfig(path string) {
 	data, err := os.ReadFile(path)

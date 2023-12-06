@@ -68,7 +68,7 @@ func (dataTree *DataTree) CreateNode(path string, data []byte, isEph bool, epher
 
 	childName := path[lastSlashIndex:]
 	if parentNode.ChildExists(childName) {
-		return childName, errors.New("invalid children as it already exists")
+		return childName, errors.New("invalid child. already exists")
 	}
 
 	// fmt.Printf("lastslashindex{%d}, parentName{%s}, childName:{%s}\n", lastSlashIndex, parentName, childName)
@@ -104,7 +104,7 @@ func (dataTree *DataTree) DeleteNode(path string, zxid int64) (string, error) {
 	}
 
 	if !parentNode.ChildExists(childName) {
-		return childName, errors.New("invalid children as it does not exists")
+		return childName, errors.New("invalid child. does not exist")
 	}
 
 	parentNode.RemoveChild(childName)
@@ -172,9 +172,10 @@ func (dataTree *DataTree) CheckWatchTrigger(transactionFragment *TransactionFrag
 	nodeName := transactionFragment.Path[lastSlashIndex:]
 
 	// Print debug information
-	fmt.Printf("Checking triggers with parentName:%s, nodeName:%s for transaction:%s\n", parentName, nodeName, transactionFragment)
+	fmt.Printf("Checking watches on parent:%s, node:%s for transaction:%s\n", parentName, nodeName, transactionFragment)
 
 	// Get parent and current nodes from the data tree
+	// TODO: errors not used
 	parentNode, _ := dataTree.GetNode(parentName)
 	node, _ := dataTree.GetNode(transactionFragment.Path)
 

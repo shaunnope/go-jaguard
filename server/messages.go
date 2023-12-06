@@ -46,12 +46,14 @@ func SendGrpc[T pb.Message, R pb.Message](
 ) (R, error) {
 	var err error = nil
 	var r R
-	for count := 0; err == nil && count < 5; count++ {
-
+	send := func() (R, error) {
 		ctx, cancel := s.EstablishConnection(to, timeout)
 		conn := s.Connections[to]
 		defer cancel()
-		r, err = F(*conn, ctx, msg)
+		return F(*conn, ctx, msg)
+	}
+	for count := 0; err == nil && count < maxRetries; count++ {
+		r, err = send()
 		if err == nil {
 			break
 		}

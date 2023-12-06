@@ -87,7 +87,7 @@ Loop:
 			getChildrenReply, err := SendClientGrpc[*pb.GetChildrenRequest, *pb.GetChildrenResponse](pb.NodeClient.GetChildren, &pb.GetChildrenRequest{Path: path, SetWatch: setWatch, ClientHost: host, ClientPort: strconv.Itoa(*port)}, *maxTimeout)
 
 			if err != nil {
-				log.Printf("Error sending read request\n")
+				fmt.Printf("ERROR LS: %s\n", err)
 			} else {
 				fmt.Printf("READ: %s has children: %s\n", path, getChildrenReply.Children)
 			}
@@ -105,7 +105,7 @@ Loop:
 
 			fmt.Printf("READ: %s %b\n", path, getData.Data)
 			if err != nil {
-				log.Printf("Error sending read request\n")
+				fmt.Printf("ERROR GET: %s\n", err)
 			}
 
 		case "getExists":
@@ -120,7 +120,7 @@ Loop:
 			getExists, err := SendClientGrpc[*pb.GetExistsRequest, *pb.GetExistsResponse](pb.NodeClient.GetExists, &pb.GetExistsRequest{Path: path, SetWatch: setWatch, ClientHost: host, ClientPort: strconv.Itoa(*port)}, *maxTimeout)
 
 			if err != nil {
-				log.Printf("Error sending read request: %s\n", err)
+				fmt.Printf("ERROR GET EXISTS: %s\n", err)
 			} else {
 				fmt.Printf("READ: %s exist: %t\n", path, getExists.Exists)
 			}
@@ -164,7 +164,7 @@ Loop:
 			createRequest, err := SendClientGrpc[*pb.CUDSRequest, *pb.CUDSResponse](pb.NodeClient.HandleClientCUDS, &pb.CUDSRequest{Path: path, Data: []byte(data), Flags: &pb.Flag{IsSequential: setSequential, IsEphemeral: setEphemeral}, OperationType: pb.OperationType_WRITE}, *maxTimeout)
 
 			if err != nil {
-				log.Printf("Error sending create request: %s\n", err)
+				fmt.Printf("ERROR CREATE: %s\n", err)
 			} else {
 				fmt.Printf("WRITE: %s is accepted: %t\n", path, *createRequest.Accept)
 			}
@@ -183,9 +183,9 @@ Loop:
 			setRequest, err := SendClientGrpc[*pb.CUDSRequest, *pb.CUDSResponse](pb.NodeClient.HandleClientCUDS, &pb.CUDSRequest{Path: path, Data: []byte(data), Flags: &pb.Flag{IsSequential: false, IsEphemeral: false}, OperationType: pb.OperationType_UPDATE}, *maxTimeout)
 
 			if err != nil {
-				log.Printf("Error sending set request: %s\n", err)
+				fmt.Printf("ERROR SET: %s\n", err)
 			} else {
-				fmt.Printf("SET: %s is accepted: %t\n", path, *setRequest.Accept)
+				fmt.Printf("SET: %s accepted: %t\n", path, *setRequest.Accept)
 			}
 
 		case "delete":
@@ -201,7 +201,7 @@ Loop:
 			deleteRequest, err := SendClientGrpc[*pb.CUDSRequest, *pb.CUDSResponse](pb.NodeClient.HandleClientCUDS, &pb.CUDSRequest{Path: path, Flags: &pb.Flag{IsSequential: false, IsEphemeral: false}, OperationType: pb.OperationType_DELETE}, *maxTimeout)
 
 			if err != nil {
-				log.Printf("Error sending delete request: %s\n", err)
+				fmt.Printf("ERROR DELETE: %s\n", err)
 			} else {
 				fmt.Printf("DELETE: %s is accepted: %t\n", path, *deleteRequest.Accept)
 			}
@@ -209,7 +209,7 @@ Loop:
 		case "sync":
 			syncRequest, err := SendClientGrpc[*pb.CUDSRequest, *pb.CUDSResponse](pb.NodeClient.HandleClientCUDS, &pb.CUDSRequest{Path: "", Flags: &pb.Flag{IsSequential: false, IsEphemeral: false}, OperationType: pb.OperationType_SYNC}, *maxTimeout)
 			if err != nil {
-				log.Printf("Error sending sync request: %s\n", err)
+				fmt.Printf("ERROR SYNC: %s\n", err)
 			} else {
 				fmt.Printf("SYNC: Accepted: %t\n", *syncRequest.Accept)
 			}

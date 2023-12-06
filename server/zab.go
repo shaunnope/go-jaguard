@@ -96,7 +96,7 @@ func (s *Server) ProposeLeader(ctx context.Context, in *pb.NewLeader) (*pb.AckLe
 		slog.Debug("Committed (Rec)", "s", s.Id, "zxid", s.LastZxid)
 		slog.Debug("Accept Leader", "s", s.Id, "epoch", in.Epoch)
 		s.SetAcceptedEpoch(int(in.Epoch))
-		res := &pb.AckLeader{}
+		res := &pb.AckLeader{Epoch: int64(s.AcceptedEpoch)}
 		return res, nil
 
 	}
@@ -120,9 +120,10 @@ func (s *Server) Commit(ctx context.Context, in *pb.ZabRequest) (*pb.Ping, error
 		if err := s.ZabDeliverAll(); err != nil {
 			return nil, err
 		}
-		slog.Debug("Committed", "s", s.Id, "zxid", s.LastZxid)
+		slog.Info("Committed", "s", s.Id, "zxid", s.LastZxid, "history", s.History)
 
 	} else {
+		slog.Info("COMMIT", "s", s.Id, "txn", in.Transaction)
 		if in.Transaction.Zxid == nil {
 			panic("nil zxid in commit")
 		}
@@ -277,40 +278,38 @@ func (s *Server) ProcessFollowerInfo() {
 
 						s.Zab.Lock()
 						defer s.Zab.Unlock()
+						to := int(in.Id)
 						// send NEWEPOCH and NEWLEADER to new follower
-						SendGrpc[*pb.NewEpoch, *pb.AckEpoch](pb.NodeClient.ProposeEpoch, s, int(in.Id), &pb.NewEpoch{Epoch: int64(s.CurrentEpoch)}, *maxTimeout)
+						SendGrpc(pb.NodeClient.ProposeEpoch, s, to, &pb.NewEpoch{Epoch: int64(s.CurrentEpoch)}, *maxTimeout)
 
 						msg := &pb.NewLeader{Epoch: int64(s.LastZxid.Epoch), History: s.History.Raw()}
-						if r, err := SendGrpc[*pb.NewLeader, *pb.AckLeader](
-							pb.NodeClient.ProposeLeader,
-							s, int(in.Id), msg,
-							*maxTimeout); err == nil {
-							SendGrpc[*pb.ZabRequest, *pb.Ping](
-								pb.NodeClient.Commit,
-								s, int(in.Id), &pb.ZabRequest{},
-								*maxTimeout)
+						if r, err := SendGrpc(pb.NodeClient.ProposeLeader,
+							s, to, msg, *maxTimeout,
+						); err == nil {
+							SendGrpc(pb.NodeClient.Commit,
+								s, to, &pb.ZabRequest{}, *maxTimeout,
+							)
 							// update leader table
-							s.Zab.FollowerEpochs[int(in.Id)] = int(r.Epoch)
+							s.Zab.FollowerEpochs[to] = int(r.Epoch)
 						}
 
 					}()
 				}
 
 			default:
+				to := int(in.Id)
 				// follower recovery
-				// 1. Send NEWLEADER to follower
-				msg := &pb.NewLeader{LastZxid: s.LastZxid.Raw()}
-				if r, err := SendGrpc[*pb.NewLeader, *pb.AckLeader](
-					pb.NodeClient.ProposeLeader,
-					s, int(in.Id), msg,
-					*maxTimeout*3); err == nil {
+				// 1. Send NEWLEADER to follower + history (SNAP)
+				msg := &pb.NewLeader{LastZxid: s.LastZxid.Raw(), History: s.History.Raw()}
+				if r, err := SendGrpc(pb.NodeClient.ProposeLeader,
+					s, to, msg, *maxTimeout*3); err == nil {
 					// update leader table (follower alr accepted lastzxid epoch)
 					// s.Zab.FollowerEpochs[int(in.Id)] = s.LastZxid.Epoch
-					s.Zab.FollowerEpochs[int(in.Id)] = int(r.Epoch)
-					slog.Info("Follower recovery", "s", s.Id, "from", in.Id, "epoch", r.Epoch)
+					s.Zab.FollowerEpochs[to] = int(r.Epoch)
+					slog.Info("F (Rec)", "s", s.Id, "F", in.Id, "epoch", r.Epoch, "history", s.History)
 				}
 				// 2. Send one of SNAP, DIFF, TRUNC to follower
-				// TODO: will just send SNAP for now
+				// TODO: will just send SNAP for now (above)
 			}
 			s.Zab.Unlock()
 		}
@@ -320,9 +319,10 @@ func (s *Server) ProcessFollowerInfo() {
 // Routine to start Zab Session
 func (s *Server) ZabStart(t0 int) error {
 	// time.Sleep(time.Duration(10000) * time.Millisecond)
-
+	recovered := false
 	if s.ZabRecover() == nil {
 		slog.Info("Recovered", "s", s.Id)
+		recovered = !*run_locally
 	} else if vote := s.FastElection(t0); vote.Id == -1 {
 		slog.Error("Election failed", "s", s.Id)
 		return errors.New("failed to elect leader")
@@ -332,7 +332,7 @@ func (s *Server) ZabStart(t0 int) error {
 	s.WaitForLive()
 	go s.Heartbeat()
 
-	s.Discovery()
+	s.Discovery(recovered)
 	slog.Info("Finished discovery", "s", s.Id)
 	return nil
 }
@@ -351,16 +351,9 @@ func (s *Server) ZabRecover() error {
 		// s.Zab.Reset()
 	case FOLLOWING:
 		msg := &pb.FollowerInfo{Id: int64(s.Id), LastZxid: s.LastZxid.Raw()}
-		var err error
-		for i := 0; i < 3; i++ {
-			if _, err = SendGrpc[*pb.FollowerInfo, *pb.Ping](
-				pb.NodeClient.InformLeader, s, s.Vote.Id,
-				msg, *maxTimeout,
-			); err == nil {
-				break
-			}
-		}
-		if err != nil {
+		if _, err := SendGrpc(pb.NodeClient.InformLeader,
+			s, s.Vote.Id, msg, *maxTimeout,
+		); err != nil {
 			slog.Error("Connection Denied", "s", s.Id, "L", s.Vote.Id, "err", err)
 			return err
 		}
@@ -372,24 +365,20 @@ func (s *Server) ZabRecover() error {
 }
 
 // Phase 1 of ZAB
-func (s *Server) Discovery() {
+func (s *Server) Discovery(recovered bool) {
 	s.Lock()
 
 	switch s.State {
 	case FOLLOWING:
 		defer s.Unlock()
-		msg := &pb.FollowerInfo{Id: int64(s.Id), LastZxid: &pb.Zxid{Epoch: int64(s.AcceptedEpoch), Counter: -1}}
-
-		var err error
-		for i := 0; i < 3; i++ {
-			if _, err = SendGrpc[*pb.FollowerInfo, *pb.Ping](
-				pb.NodeClient.InformLeader, s, s.Vote.Id,
-				msg, *maxTimeout,
-			); err == nil {
-				break
-			}
+		if recovered {
+			return
 		}
-		if err != nil {
+		msg := &pb.FollowerInfo{
+			Id: int64(s.Id), LastZxid: &pb.Zxid{Epoch: int64(s.AcceptedEpoch), Counter: -1},
+		}
+		if _, err := SendGrpc(pb.NodeClient.InformLeader,
+			s, s.Vote.Id, msg, *maxTimeout); err != nil {
 			slog.Error("Connection Denied", "s", s.Id, "L", s.Vote.Id, "err", err)
 		}
 
@@ -447,10 +436,8 @@ func (s *Server) ZabSync() {
 	msg := &pb.NewLeader{Epoch: int64(s.CurrentEpoch), History: s.History.Raw()}
 	for i := range s.Zab.FollowerEpochs {
 		go func(idx int) {
-			if _, err := SendGrpc[*pb.NewLeader, *pb.AckLeader](
-				pb.NodeClient.ProposeLeader,
-				s, idx, msg,
-				*maxTimeout); err == nil {
+			if _, err := SendGrpc(pb.NodeClient.ProposeLeader,
+				s, idx, msg, *maxTimeout); err == nil {
 				ready <- true
 			}
 		}(i)
@@ -463,10 +450,7 @@ func (s *Server) ZabSync() {
 	}
 	// send commit to all followers
 	for i := range s.Zab.FollowerEpochs {
-		SendGrpc[*pb.ZabRequest, *pb.Ping](
-			pb.NodeClient.Commit,
-			s, i, &pb.ZabRequest{},
-			*maxTimeout)
+		SendGrpc(pb.NodeClient.Commit, s, i, &pb.ZabRequest{}, *maxTimeout)
 	}
 
 	// phase 3
@@ -500,7 +484,7 @@ func (s *Server) ZabDeliver(t pb.TransactionFragment) error {
 	}
 
 	t.Committed = true
-	// s.History = append(s.History, t)
+	s.History.Transactions = append(s.History.Transactions, t)
 	s.SetLastZxid(t.Zxid)
 	slog.Info("Commit", "s", s.Id, "txn", t)
 

@@ -82,6 +82,10 @@ type TransactionFragments struct {
 	LastCommitId int
 }
 
+func (ts TransactionFragments) String() string {
+	return fmt.Sprintf("%d %v", ts.LastCommitId, ts.Transactions)
+}
+
 func (ts TransactionFragments) Len() int {
 	return len(ts.Transactions)
 }
