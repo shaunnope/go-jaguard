@@ -201,9 +201,9 @@ func (sv *StateVector) SetEpochs(accepted *int, current *int) {
 	copy(data[0:8], utils.MarshalInt(*accepted))
 	copy(data[8:16], utils.MarshalInt(*current))
 	if err := sv.SaveState(data_EPOCH, data); err != nil {
-		slog.Error("SetEpochs", "err", err)
+		slog.Error("SetEpochs", "s", sv.Id, "err", err)
 	} else {
-		slog.Info("SetEpochs", "a", *accepted, "c", *current)
+		slog.Info("SetEpochs", "s", sv.Id, "a", *accepted, "c", *current)
 		sv.AcceptedEpoch = *accepted
 		sv.CurrentEpoch = *current
 	}
@@ -218,7 +218,6 @@ func (sv *StateVector) SetLastZxid(zxid pb.ZxidFragment) {
 	}
 }
 
-func (sv *StateVector) ReplaceHistory(history []pb.TransactionFragment) {
-
-	sv.History.Set(history)
+func (sv *StateVector) ReplaceHistory(history []*pb.Transaction) {
+	sv.History.Set(pb.Transactions(history).ExtractAll())
 }

@@ -33,7 +33,8 @@ func (s *Server) ProposeEpoch(ctx context.Context, in *pb.NewEpoch) (*pb.AckEpoc
 		return nil, errors.New("not follower")
 	}
 
-	if int(in.Epoch) > s.AcceptedEpoch {
+	// TODO: verify if equality is ok
+	if int(in.Epoch) >= s.AcceptedEpoch {
 		slog.Debug("Accept Epoch", "s", s.Id, "epoch", in.Epoch)
 		s.SetAcceptedEpoch(int(in.Epoch))
 		res := &pb.AckEpoch{CurrentEpoch: int64(s.AcceptedEpoch), History: s.History.Raw(), LastZxid: s.LastZxid.Raw()}
@@ -43,6 +44,7 @@ func (s *Server) ProposeEpoch(ctx context.Context, in *pb.NewEpoch) (*pb.AckEpoc
 
 	if int(in.Epoch) < s.AcceptedEpoch {
 		go func() {
+			slog.Info("EPOCH LT", "s", s.Id, "epoch", in.Epoch)
 			s.Reelect <- true
 		}()
 	}
@@ -67,43 +69,41 @@ func (s *Server) ProposeLeader(ctx context.Context, in *pb.NewLeader) (*pb.AckLe
 
 			// update history
 			// TODO: store to non-volatile memory
-			s.History.Set(pb.Transactions(in.History).ExtractAll())
+			s.ReplaceHistory(in.History)
 
 			slog.Debug("Accept Leader", "s", s.Id, "epoch", in.Epoch)
-			s.SetAcceptedEpoch(int(in.Epoch))
 			res := &pb.AckLeader{}
 			return res, nil
 		}
 		log.Printf("%d rejected new leader: %d", s.Id, in.Epoch)
 
-		go func() {
-			s.Reelect <- true
-		}()
 	default:
 		// follower fault
 		if in.LastZxid.Extract().Epoch < s.LastZxid.Epoch {
-			go func() {
-				s.Reelect <- true
-			}()
-			return nil, errors.New("leader not accepted")
+			goto Reelect
 		}
 		// TODO: implement DIFF, TRUNC. For now, just SNAP
 		// copy the snapshot received and commit the changes
 		// update history
 		// TODO: reset datatree
 		// TODO: store to non-volatile memory
-		s.History.Set(pb.Transactions(in.History).ExtractAll())
+		s.ReplaceHistory(in.History)
 
 		if err := s.ZabDeliverAll(); err != nil {
 			return nil, err
 		}
 		slog.Debug("Committed (Rec)", "s", s.Id, "zxid", s.LastZxid)
-
 		slog.Debug("Accept Leader", "s", s.Id, "epoch", in.Epoch)
 		s.SetAcceptedEpoch(int(in.Epoch))
 		res := &pb.AckLeader{}
 		return res, nil
+
 	}
+Reelect:
+	slog.Error("Leader rejected", "s", s.Id, "epoch", in.Epoch)
+	go func() {
+		s.Reelect <- true
+	}()
 
 	return nil, errors.New("leader not accepted")
 }
@@ -126,7 +126,7 @@ func (s *Server) Commit(ctx context.Context, in *pb.ZabRequest) (*pb.Ping, error
 			panic("nil zxid in commit")
 		}
 		go func() {
-			// deliver transaction when ready
+			// TODO: deliver transaction when ready
 		}()
 	}
 
@@ -139,6 +139,7 @@ func (s *Server) SendZabRequest(ctx context.Context, in *pb.ZabRequest) (*pb.Zab
 		return nil, errors.New("not follower")
 	}
 	// only run when leader is ready
+	// FIXME: should wait for leader to be ready, but currently blocks
 	// if _, ok := <-s.Zab.BroadcastReady; ok {
 	// 	panic(fmt.Sprintf("%d: unexpected data on BroadcastReady", s.Id))
 	// }
@@ -261,7 +262,7 @@ func (s *Server) ProcessFollowerInfo() {
 					fmt.Println(string(jsonData))
 
 					if len(s.Zab.FollowerEpochs) > len(config.Servers)/2 {
-						slog.Debug("Got quorum", "s", s.Id)
+						slog.Info("Got quorum", "s", s.Id)
 						s.Zab.HasQuorum = true
 						s.Zab.QuorumReady <- true
 					}
@@ -302,7 +303,8 @@ func (s *Server) ProcessFollowerInfo() {
 					pb.NodeClient.ProposeLeader,
 					s, int(in.Id), msg,
 					*maxTimeout*3); err == nil {
-					// update leader table
+					// update leader table (follower alr accepted lastzxid epoch)
+					// s.Zab.FollowerEpochs[int(in.Id)] = s.LastZxid.Epoch
 					s.Zab.FollowerEpochs[int(in.Id)] = int(r.Epoch)
 					slog.Info("Follower recovery", "s", s.Id, "from", in.Id, "epoch", r.Epoch)
 				}
@@ -316,13 +318,15 @@ func (s *Server) ProcessFollowerInfo() {
 
 // Routine to start Zab Session
 func (s *Server) ZabStart(t0 int) error {
-	if s.ZabRecover() == nil {
-		slog.Info("Recovered", "s", s.Id)
-	} else if vote := s.FastElection(t0); vote.Id == -1 {
+	// if s.ZabRecover() == nil {
+	// 	slog.Info("Recovered", "s", s.Id)
+	// } else
+	if vote := s.FastElection(t0); vote.Id == -1 {
 		slog.Error("Election failed", "s", s.Id)
 		return errors.New("failed to elect leader")
+	} else {
+		slog.Info("Elected", "s", s.Id, "L", vote.Id)
 	}
-
 	go s.Heartbeat()
 	time.Sleep(200 * time.Millisecond)
 
@@ -341,9 +345,10 @@ func (s *Server) ZabRecover() error {
 	switch s.State {
 	case LEADING:
 		s.SetLastZxid(s.LastZxid.Next())
-		s.Zab.Reset()
+		// TODO: check if needed here
+		// s.Zab.Reset()
 	case FOLLOWING:
-		msg := &pb.FollowerInfo{LastZxid: s.LastZxid.Raw()}
+		msg := &pb.FollowerInfo{Id: int64(s.Id), LastZxid: s.LastZxid.Raw()}
 		var err error
 		for i := 0; i < 3; i++ {
 			if _, err = SendGrpc[*pb.FollowerInfo, *pb.Ping](
@@ -355,9 +360,11 @@ func (s *Server) ZabRecover() error {
 		}
 		if err != nil {
 			slog.Error("Connection Denied", "s", s.Id, "L", s.Vote.Id, "err", err)
-			s.Reelect <- true
+			return err
 		}
 		slog.Debug("Connected", "s", s.Id, "L", s.Vote.Id)
+	default:
+		return fmt.Errorf("invalid state: %d", s.State)
 	}
 	return nil
 }
@@ -404,7 +411,7 @@ func (s *Server) Discovery() {
 
 		log.Printf("%d most recent: %d", s.Id, mostRecent.CurrentEpoch)
 		// TODO: store to non-volatile memory
-		s.History.Set(pb.Transactions(mostRecent.History).ExtractAll())
+		s.ReplaceHistory(mostRecent.History)
 		s.Zab.Unlock()
 
 		// goto phase 2

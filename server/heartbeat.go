@@ -18,6 +18,7 @@ func (s *Server) ReelectListener() {
 			}
 			return
 		case <-s.Reelect:
+			slog.Info("Reelecting", "s", s.Id)
 			if vote := s.FastElection(*maxTimeout); vote.Id == -1 {
 				slog.Error("Election failed", "s", s.Id)
 				s.Stop <- true
@@ -32,10 +33,6 @@ func (s *Server) Heartbeat() {
 		return
 	}
 
-	// trigger shutdown
-	// defer func() {
-	// 	close(s.Stop)
-	// }()
 	go s.ReelectListener()
 
 	for {
@@ -47,19 +44,28 @@ func (s *Server) Heartbeat() {
 		case LEADING:
 			failed := make(map[int]bool)
 			wg := sync.WaitGroup{}
-			wg.Add(len(config.Servers) - 1)
-			for idx := range config.Servers {
-				if idx == s.Id {
-					continue
+			SendPing := func(i int) {
+				_, err := SendGrpc[*pb.Ping, *pb.Ping](pb.NodeClient.SendPing, s, i, &pb.Ping{Data: int64(s.Id)}, *maxTimeout)
+				if err != nil {
+					failed[i] = true
 				}
-
-				go func(i int) {
-					_, err := SendGrpc[*pb.Ping, *pb.Ping](pb.NodeClient.SendPing, s, i, &pb.Ping{Data: int64(s.Id)}, *maxTimeout)
-					if err != nil {
-						failed[i] = true
+				wg.Done()
+			}
+			// TODO: race cond on HasQuorum
+			switch s.Zab.HasQuorum {
+			case true:
+				wg.Add(len(s.Zab.FollowerEpochs))
+				for idx := range s.Zab.FollowerEpochs {
+					go SendPing(idx)
+				}
+			case false:
+				wg.Add(len(config.Servers) - 1)
+				for idx := range config.Servers {
+					if idx == s.Id {
+						continue
 					}
-					wg.Done()
-				}(idx)
+					go SendPing(idx)
+				}
 			}
 			// check for failed nodes
 			wg.Wait()
@@ -70,13 +76,6 @@ func (s *Server) Heartbeat() {
 			}
 
 		case FOLLOWING:
-			// Simulate failure
-			// fail := rand.Intn(100) < 10
-			// if fail {
-			// 	log.Printf("%d failed", s.Id)
-			// 	return
-			// }
-
 			// Send heartbeat to leader
 			_, err := SendGrpc[*pb.Ping, *pb.Ping](pb.NodeClient.SendPing, s, s.Vote.Id, &pb.Ping{Data: int64(s.Id)}, *maxTimeout)
 			if err != nil {
