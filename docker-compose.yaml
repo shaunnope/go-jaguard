@@ -88,7 +88,7 @@ services:
   server-6:
     image: zookeeper_server:latest
     ports:
-      - "50056:50057"
+      - "50057:50057"
     networks:
       - mynetwork
     command: bash -c "go run *.go"

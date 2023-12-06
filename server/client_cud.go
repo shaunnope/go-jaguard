@@ -139,7 +139,7 @@ func (s *Server) GetData(ctx context.Context, in *pb.GetDataRequest) (*pb.GetDat
 func (s *Server) GetChildren(ctx context.Context, in *pb.GetChildrenRequest) (*pb.GetChildrenResponse, error) {
 	children, err := s.StateVector.Data.GetNodeChildren(in.Path)
 
-	fmt.Printf("Host:%s, Port:%s\n", in.ClientHost, in.ClientPort)
+	fmt.Printf("CONNECTED: s%d %s:%s\n", s.Id, in.ClientHost, in.ClientPort)
 	if in.SetWatch {
 		s.StateVector.Data.AddWatchToNode(in.Path, &pb.Watch{
 			Path:       in.Path,

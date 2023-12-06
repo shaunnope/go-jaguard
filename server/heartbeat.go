@@ -89,3 +89,22 @@ func (s *Server) Heartbeat() {
 		time.Sleep(time.Duration(*maxTimeout) * time.Millisecond)
 	}
 }
+
+// Listener to wait for liveness of ensemble
+func (s *Server) WaitForLive() {
+	done := make(map[int]bool)
+	for len(done) < len(config.Servers)/2+1 {
+		for idx := range config.Servers {
+			if idx == s.Id {
+				continue
+			}
+			if _, ok := done[idx]; ok {
+				continue
+			}
+			if r, err := SendGrpc[*pb.Ping, *pb.Ping](pb.NodeClient.SendPing, s, idx, &pb.Ping{Data: int64(s.Id)}, *maxTimeout); err == nil && State(r.Data) > ELECTION {
+				done[idx] = true
+			}
+		}
+		time.Sleep(time.Duration(*maxTimeout) * time.Millisecond)
+	}
+}

@@ -189,23 +189,18 @@ func (sv *StateVector) SetAcceptedEpoch(epoch int) {
 	}
 }
 
-func (sv *StateVector) SetEpochs(accepted *int, current *int) {
+// Update current and accepted epoch
+func (sv *StateVector) SetEpochs(epoch int) {
 	data := make([]byte, 16)
-	if accepted == nil {
-		accepted = &sv.AcceptedEpoch
-	}
-	if current == nil {
-		current = &sv.CurrentEpoch
-	}
 
-	copy(data[0:8], utils.MarshalInt(*accepted))
-	copy(data[8:16], utils.MarshalInt(*current))
+	copy(data[0:8], utils.MarshalInt(epoch))
+	copy(data[8:16], utils.MarshalInt(epoch))
 	if err := sv.SaveState(data_EPOCH, data); err != nil {
 		slog.Error("SetEpochs", "s", sv.Id, "err", err)
 	} else {
-		slog.Info("SetEpochs", "s", sv.Id, "a", *accepted, "c", *current)
-		sv.AcceptedEpoch = *accepted
-		sv.CurrentEpoch = *current
+		slog.Info("SetEpochs", "s", sv.Id, "epoch", epoch)
+		sv.AcceptedEpoch = epoch
+		sv.CurrentEpoch = epoch
 	}
 }
 

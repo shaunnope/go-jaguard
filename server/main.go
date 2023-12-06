@@ -16,8 +16,6 @@ var (
 
 	logDir = flag.String("log", "out", "path to log directory")
 
-	// idx = flag.Int("idx", 0, "server index")
-
 	maxTimeout = flag.Int("maxTimeout", 10000, "max timeout for election")
 
 	run_locally = flag.Bool("local", false, "Run entire system locally")
@@ -27,6 +25,8 @@ var (
 	leader_verbo = flag.Bool("leader_verbo", false, "Set to true if flag is present")
 	call_watch   = flag.Bool("call_watch", false, "Set to true if flag is present")
 )
+
+const version string = "0.0.2"
 
 func parseConfig(path string) {
 	data, err := os.ReadFile(path)
@@ -64,7 +64,7 @@ func main() {
 			log.Fatalf("failed to get ID from environment: %v", dock_err)
 		}
 
-		fmt.Printf("Starting server %d\n", id)
+		fmt.Printf("Starting server %d v%s\n", id, version)
 
 		fileName := fmt.Sprintf("server%d.txt", id)
 		_, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)

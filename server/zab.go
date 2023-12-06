@@ -20,6 +20,7 @@ import (
 func (s *Server) InformLeader(ctx context.Context, in *pb.FollowerInfo) (*pb.Ping, error) {
 	if s.State != LEADING {
 		// only leader should receive follower info
+		slog.Error("Received FollowerInfo", "s", s.Id, "err", "not leader")
 		s.Reelect <- true
 		return nil, errors.New("not leader")
 	}
@@ -318,17 +319,18 @@ func (s *Server) ProcessFollowerInfo() {
 
 // Routine to start Zab Session
 func (s *Server) ZabStart(t0 int) error {
-	// if s.ZabRecover() == nil {
-	// 	slog.Info("Recovered", "s", s.Id)
-	// } else
-	if vote := s.FastElection(t0); vote.Id == -1 {
+	// time.Sleep(time.Duration(10000) * time.Millisecond)
+
+	if s.ZabRecover() == nil {
+		slog.Info("Recovered", "s", s.Id)
+	} else if vote := s.FastElection(t0); vote.Id == -1 {
 		slog.Error("Election failed", "s", s.Id)
 		return errors.New("failed to elect leader")
 	} else {
 		slog.Info("Elected", "s", s.Id, "L", vote.Id)
 	}
+	s.WaitForLive()
 	go s.Heartbeat()
-	time.Sleep(200 * time.Millisecond)
 
 	s.Discovery()
 	slog.Info("Finished discovery", "s", s.Id)
@@ -377,7 +379,19 @@ func (s *Server) Discovery() {
 	case FOLLOWING:
 		defer s.Unlock()
 		msg := &pb.FollowerInfo{Id: int64(s.Id), LastZxid: &pb.Zxid{Epoch: int64(s.AcceptedEpoch), Counter: -1}}
-		SendGrpc[*pb.FollowerInfo, *pb.Ping](pb.NodeClient.InformLeader, s, s.Vote.Id, msg, *maxTimeout)
+
+		var err error
+		for i := 0; i < 3; i++ {
+			if _, err = SendGrpc[*pb.FollowerInfo, *pb.Ping](
+				pb.NodeClient.InformLeader, s, s.Vote.Id,
+				msg, *maxTimeout,
+			); err == nil {
+				break
+			}
+		}
+		if err != nil {
+			slog.Error("Connection Denied", "s", s.Id, "L", s.Vote.Id, "err", err)
+		}
 
 	case LEADING:
 		s.Zab.Reset()
@@ -391,8 +405,7 @@ func (s *Server) Discovery() {
 			}
 		}
 		slog.Info("Max epoch", "s", s.Id, "epoch", maxEpoch)
-		newEpoch := maxEpoch + 1
-		s.SetEpochs(&newEpoch, &newEpoch)
+		s.SetEpochs(maxEpoch + 1)
 
 		mostRecent := &pb.AckEpoch{CurrentEpoch: -1, History: nil, LastZxid: &pb.Zxid{Epoch: -1, Counter: -1}}
 		for idx := range s.Zab.FollowerEpochs {

@@ -76,6 +76,7 @@ func (s *Server) ElectNotify(from int) *pb.ElectResponse {
 
 	// send vote notification
 	// TODO: adjust timeout value
+	// TODO: Handle error?
 	r, _ := SendGrpc[*pb.ElectNotification, *pb.ElectResponse](pb.NodeClient.Elect, s, from, msg, *maxTimeout)
 
 	return r

@@ -101,7 +101,7 @@ func (ts TransactionFragments) Raw() []*Transaction {
 }
 
 func (ts *TransactionFragments) LastCommitZxid() ZxidFragment {
-	if ts.LastCommitId == -1 {
+	if ts.LastCommitId == -1 || ts.LastCommitId >= len(ts.Transactions) {
 		return ZxidFragment{}
 	}
 	return ts.Transactions[ts.LastCommitId].Zxid

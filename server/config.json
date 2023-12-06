@@ -23,6 +23,10 @@
         {
             "host": "server-5",
             "port": 50056
+        },
+        {
+            "host": "server-6",
+            "port": 50057
         }
     ]
 }
