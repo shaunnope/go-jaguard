@@ -93,6 +93,8 @@ func (s *Server) Heartbeat() {
 // Listener to wait for liveness of ensemble
 func (s *Server) WaitForLive() {
 	done := make(map[int]bool)
+	// TODO: consider how many to wait for
+	// TODO: try concurrent broadcast
 	for len(done) < len(config.Servers)/2+1 {
 		for idx := range config.Servers {
 			if idx == s.Id {
@@ -105,6 +107,6 @@ func (s *Server) WaitForLive() {
 				done[idx] = true
 			}
 		}
-		time.Sleep(time.Duration(*maxTimeout) * time.Millisecond)
+		time.Sleep(time.Duration(*maxTimeout/2) * time.Millisecond)
 	}
 }
