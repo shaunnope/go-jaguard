@@ -4,7 +4,7 @@ go 1.21.1
 
 require (
 	github.com/shaunnope/go-jaguard/zouk v0.0.0-00010101000000-000000000000
-	github.com/shaunnope/go-jaguard/utils v0.0.0-00010101000000-000000000000 // indirect
+	github.com/shaunnope/go-jaguard/utils v0.0.0-00010101000000-000000000000
 	google.golang.org/grpc v1.58.2
 )
 

@@ -17,6 +17,10 @@ func (z *Zxid) Extract() ZxidFragment {
 	return ZxidFragment{Epoch: int(z.Epoch), Counter: int(z.Counter)}
 }
 
+func (z ZxidFragment) String() string {
+	return fmt.Sprintf("{%d %d}", z.Epoch, z.Counter)
+}
+
 func (z ZxidFragment) LessThan(other ZxidFragment) bool {
 	return z.Epoch < other.Epoch || (z.Epoch == other.Epoch && z.Counter < other.Counter)
 }
@@ -98,7 +102,7 @@ func (ts TransactionFragments) Raw() []*Transaction {
 
 func (ts *TransactionFragments) LastCommitZxid() ZxidFragment {
 	if ts.LastCommitId == -1 {
-		return ZxidFragment{Epoch: -1}
+		return ZxidFragment{}
 	}
 	return ts.Transactions[ts.LastCommitId].Zxid
 }

@@ -12,8 +12,7 @@ type Message interface {
 }
 
 func (m *NewEpoch) Error(from int, to int, err error) {
-	slog.Error("NewEpoch", "from", from, "to", to, "err", err)
-	// log.Printf("%d error sending epoch to %d: %v", from, to, err)
+	slog.Debug("NewEpoch Error", "from", from, "to", to, "err", err)
 }
 
 func (m *NewEpoch) Done(from int, to int) {
@@ -54,7 +53,8 @@ func (m *FollowerInfo) Done(from int, to int) {
 }
 
 func (m *Ping) Error(from int, to int, err error) {
-	log.Printf("%d error sending ping to %d: %v", from, to, err)
+	// log.Printf("%d error sending ping to %d: %v", from, to, err)
+	slog.Debug("Ping", "from", from, "to", to, "err", err)
 }
 
 func (m *Ping) Done(from int, to int) {
@@ -62,7 +62,7 @@ func (m *Ping) Done(from int, to int) {
 }
 
 func (m *ElectNotification) Error(from int, to int, err error) {
-	slog.Error("ElectNotif", "from", from, "to", to, "err", err)
+	slog.Debug("ElectNotif", "from", from, "to", to, "err", err)
 }
 
 func (m *ElectNotification) Done(from int, to int) {
