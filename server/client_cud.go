@@ -18,7 +18,7 @@ func (s *Server) HandleClientCUDS(ctx context.Context, in *pb.CUDSRequest) (*pb.
 		slog.Debug("Client Forward", "s", s.Id, "to", s.Vote.Id, "request", in)
 		// TODO: verify version
 		// forward to leader
-		r, err := SendGrpc[*pb.CUDSRequest, *pb.CUDSResponse](pb.NodeClient.HandleClientCUDS, s, s.Vote.Id, in, *maxTimeout)
+		r, err := SendGrpc(pb.NodeClient.HandleClientCUDS, s, s.Vote.Id, in, *maxTimeout)
 
 		return r, err
 	case LEADING:
@@ -43,15 +43,12 @@ func (s *Server) HandleClientCUDS(ctx context.Context, in *pb.CUDSRequest) (*pb.
 		slog.Info("Client Propose", "s", s.Id, "majority", majoritySize, "request", msg)
 		done := make(chan bool, majoritySize)
 
-		log.Printf("server %d prepare to send message: %s", s.Id, msg.Transaction.LogString())
+		log.Printf("server %d prepare to send message: %s", s.Id, msg.Transaction.Extract())
 		copiedMsg := &pb.ZabRequest{
 			Transaction: msg.Transaction,
 			RequestType: msg.RequestType,
 		}
 		for idx := range s.Zab.FollowerEpochs {
-			if idx == s.Id {
-				continue
-			}
 			go func(i int) {
 				if r, err := SendGrpc[*pb.ZabRequest, *pb.ZabAck](pb.NodeClient.SendZabRequest, s, i, copiedMsg, *maxTimeout); err == nil && r.Accept {
 					done <- true
@@ -75,7 +72,7 @@ func (s *Server) HandleClientCUDS(ctx context.Context, in *pb.CUDSRequest) (*pb.
 				}
 			}
 			if transaction.Type == pb.OperationType_UPDATE {
-				fmt.Printf("Transaction's Data update with %s", transaction.Data)
+				fmt.Printf("Transaction's Data update with %s\n", transaction.Data)
 			}
 			err = s.ZabDeliver(msg.Transaction.Extract())
 			if in.OperationType == pb.OperationType_WRITE {
@@ -92,8 +89,10 @@ func (s *Server) HandleClientCUDS(ctx context.Context, in *pb.CUDSRequest) (*pb.
 			if idx == s.Id {
 				continue
 			}
-			slog.Info("HandleClientCUD", "s", s.Id, "to", idx, "type", msg.RequestType, "txn", msg.Transaction.Extract())
-			SendGrpc[*pb.ZabRequest, *pb.ZabAck](pb.NodeClient.SendZabRequest, s, idx, msg, *maxTimeout)
+
+			if _, serr := SendGrpc(pb.NodeClient.SendZabRequest, s, idx, msg, *maxTimeout); serr == nil {
+				slog.Info("HandleClientCUD", "s", s.Id, "to", idx, "type", msg.RequestType, "txn", msg.Transaction.Extract())
+			}
 		}
 
 		accepted := true

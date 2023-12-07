@@ -142,10 +142,6 @@ func (t *Transaction) ExtractLog() TransactionFragment {
 	}
 }
 
-func (t *Transaction) LogString() string {
-	return fmt.Sprintf("Zxid: %v %s @ PATH: %s", t.Zxid.Extract(), t.Type, t.Path)
-}
-
 func (t *Transaction) WithZxid(z ZxidFragment) *Transaction {
 	return &Transaction{
 		Zxid:  z.Raw(),

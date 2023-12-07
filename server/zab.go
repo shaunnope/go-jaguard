@@ -149,7 +149,7 @@ func (s *Server) SendZabRequest(ctx context.Context, in *pb.ZabRequest) (*pb.Zab
 	// Handle incoming CreateRequest
 	switch in.RequestType {
 	case pb.RequestType_PROPOSAL:
-		slog.Info("Proposal", "s", s.Id, "txn", in.Transaction.LogString())
+		slog.Info("Proposal", "s", s.Id, "txn", in.Transaction.Extract())
 
 		// TODO: verify version
 		// send ack to leader
@@ -200,7 +200,6 @@ func (s *Server) HandleOperation(transaction pb.TransactionFragment) (string, er
 			fmt.Println("Error:", err)
 			return "", err
 		}
-		// log.Printf("server %d created znode @ PATH: %s", s.Id, path)
 		fileName := fmt.Sprintf("server%d.txt", s.Id)
 		file, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
 		if err != nil {
@@ -319,10 +318,8 @@ func (s *Server) ProcessFollowerInfo() {
 // Routine to start Zab Session
 func (s *Server) ZabStart(t0 int) error {
 	// time.Sleep(time.Duration(10000) * time.Millisecond)
-	recovered := false
 	if s.ZabRecover() == nil {
 		slog.Info("Recovered", "s", s.Id)
-		recovered = !*run_locally
 	} else if vote := s.FastElection(t0); vote.Id == -1 {
 		slog.Error("Election failed", "s", s.Id)
 		return errors.New("failed to elect leader")
@@ -332,7 +329,7 @@ func (s *Server) ZabStart(t0 int) error {
 	s.WaitForLive()
 	go s.Heartbeat()
 
-	s.Discovery(recovered)
+	s.Discovery()
 	slog.Info("Finished discovery", "s", s.Id)
 	return nil
 }
@@ -365,15 +362,12 @@ func (s *Server) ZabRecover() error {
 }
 
 // Phase 1 of ZAB
-func (s *Server) Discovery(recovered bool) {
+func (s *Server) Discovery() {
 	s.Lock()
 
 	switch s.State {
 	case FOLLOWING:
 		defer s.Unlock()
-		if recovered {
-			return
-		}
 		msg := &pb.FollowerInfo{
 			Id: int64(s.Id), LastZxid: &pb.Zxid{Epoch: int64(s.AcceptedEpoch), Counter: -1},
 		}

@@ -42,31 +42,34 @@ func (s *Server) Heartbeat() {
 		case DOWN:
 			return
 		case LEADING:
-			failed := make(map[int]bool)
+			failed := make([]int, 0)
+			lock := sync.Mutex{}
 			wg := sync.WaitGroup{}
 			SendPing := func(i int) {
 				_, err := SendGrpc[*pb.Ping, *pb.Ping](pb.NodeClient.SendPing, s, i, &pb.Ping{Data: int64(s.Id)}, *maxTimeout)
 				if err != nil {
-					failed[i] = true
+					lock.Lock()
+					failed = append(failed, i)
+					lock.Unlock()
 				}
 				wg.Done()
 			}
 			// TODO: race cond on HasQuorum
-			switch s.Zab.HasQuorum {
-			case true:
-				wg.Add(len(s.Zab.FollowerEpochs))
-				for idx := range s.Zab.FollowerEpochs {
-					go SendPing(idx)
+			// switch s.Zab.HasQuorum {
+			// case true:
+			// 	wg.Add(len(s.Zab.FollowerEpochs))
+			// 	for idx := range s.Zab.FollowerEpochs {
+			// 		go SendPing(idx)
+			// 	}
+			// case false:
+			wg.Add(len(config.Servers) - 1)
+			for idx := range config.Servers {
+				if idx == s.Id {
+					continue
 				}
-			case false:
-				wg.Add(len(config.Servers) - 1)
-				for idx := range config.Servers {
-					if idx == s.Id {
-						continue
-					}
-					go SendPing(idx)
-				}
+				go SendPing(idx)
 			}
+			// }
 			// check for failed nodes
 			wg.Wait()
 			if len(failed) > len(config.Servers)/2 {

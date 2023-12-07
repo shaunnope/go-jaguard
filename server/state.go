@@ -70,6 +70,13 @@ func (l *ZabSession) Reset() {
 	l.Abort = make(chan bool)
 }
 
+func (l *ZabSession) RemoveFollower(id int) {
+	l.Lock()
+	defer l.Unlock()
+	delete(l.FollowerEpochs, id)
+	slog.Info("Removed follower", "follower", id)
+}
+
 type Transactions = pb.TransactionFragments
 
 type StateVector struct {

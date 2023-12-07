@@ -78,14 +78,14 @@ func (m *ElectResponse) Done(from int, to int) {
 }
 
 func (m *ZabRequest) Error(from int, to int, err error) {
-	slog.Error("ZabRequest", "from", from, "to", to, "err", err)
+	slog.Debug("ZabRequest", "from", from, "to", to, "err", err)
 }
 
 func (m *ZabRequest) Done(from int, to int) {
 	if m.Transaction == nil {
 		return
 	}
-	slog.Debug("ZabRequest", "from", from, "to", to, "request", m.Transaction.LogString())
+	slog.Debug("ZabRequest", "from", from, "to", to, "request", m.Transaction.Extract())
 }
 
 func (m *ZabAck) Error(from int, to int, err error) {
