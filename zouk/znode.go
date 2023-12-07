@@ -3,6 +3,7 @@ package zouk
 import (
 	"errors"
 	"fmt"
+	"sort"
 )
 
 type Stat struct {
@@ -59,11 +60,25 @@ func (znode *Znode) ChildExists(childName string) bool {
 	return exists
 }
 
-func (znode *Znode) GetChildren() map[string]bool {
-	copyChildren := map[string]bool{}
-	for key, value := range znode.Children {
-		copyChildren[key] = value
+func sortMapByKey(copyChildren map[string]bool) map[string]bool {
+	keys := make([]string, 0, len(copyChildren))
+	for key := range copyChildren {
+		keys = append(keys, key)
 	}
+
+	sort.Strings(keys)
+
+	sortedCopyChildren := make(map[string]bool)
+	for _, key := range keys {
+		sortedCopyChildren[key] = copyChildren[key]
+	}
+
+	return sortedCopyChildren
+}
+
+func (znode *Znode) GetChildren() map[string]bool {
+	copyChildren := sortMapByKey(znode.Children)
+
 	return copyChildren
 }
 
