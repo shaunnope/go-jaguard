@@ -319,6 +319,15 @@ func (s *Server) ProcessFollowerInfo() {
 	}
 }
 
+func (s *Server) Startup() {
+	slog.Info("Startup", "s", s.Id)
+	s.WaitForLive()
+	go s.Heartbeat()
+
+	s.Discovery()
+	slog.Info("Startup complete", "s", s.Id)
+}
+
 // Routine to start Zab Session
 func (s *Server) ZabStart(t0 int) error {
 	// time.Sleep(time.Duration(10000) * time.Millisecond)
@@ -330,11 +339,8 @@ func (s *Server) ZabStart(t0 int) error {
 	} else {
 		slog.Info("Elected", "s", s.Id, "L", vote.Id)
 	}
-	s.WaitForLive()
-	go s.Heartbeat()
 
-	s.Discovery()
-	slog.Info("Finished discovery", "s", s.Id)
+	s.Startup()
 	return nil
 }
 
@@ -454,7 +460,7 @@ func (s *Server) ZabSync() {
 	// phase 3
 	if err := s.ZabDeliverAll(); err != nil {
 		slog.Error("ZabSync", "s", s.Id, "err", err)
-		panic("failed to deliver")
+		// panic("failed to deliver")
 	}
 	if s.History.Len() == 0 {
 		s.SetLastZxid(pb.ZxidFragment{Epoch: s.CurrentEpoch})

@@ -1,0 +1,7 @@
+docker exec go-jaguard-server-0-1 bash -c "rm -r ./out"
+docker exec go-jaguard-server-1-1 bash -c "rm -r ./out"
+docker exec go-jaguard-server-2-1 bash -c "rm -r ./out"
+docker exec go-jaguard-server-3-1 bash -c "rm -r ./out"
+docker exec go-jaguard-server-4-1 bash -c "rm -r ./out"
+docker exec go-jaguard-server-5-1 bash -c "rm -r ./out"
+docker exec go-jaguard-server-6-1 bash -c "rm -r ./out"

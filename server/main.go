@@ -16,7 +16,7 @@ var (
 
 	logDir = flag.String("log", "out", "path to log directory")
 
-	maxTimeout = flag.Int("maxTimeout", 10000, "max timeout for election")
+	maxTimeout = flag.Int("maxTimeout", 1000, "max timeout for election")
 
 	run_locally = flag.Bool("local", false, "Run entire system locally")
 

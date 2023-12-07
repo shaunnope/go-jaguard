@@ -40,7 +40,6 @@ func (m *AckLeader) Error(from int, to int, err error) {
 }
 
 func (m *AckLeader) Done(from int, to int) {
-	// log.Printf("%d sent leader ack to %d", from, to)
 	slog.Debug("AckLeader", "from", from, "to", to)
 }
 
@@ -53,7 +52,6 @@ func (m *FollowerInfo) Done(from int, to int) {
 }
 
 func (m *Ping) Error(from int, to int, err error) {
-	// log.Printf("%d error sending ping to %d: %v", from, to, err)
 	slog.Debug("Ping", "from", from, "to", to, "err", err)
 }
 
