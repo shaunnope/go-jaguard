@@ -147,7 +147,11 @@ func (znode *Znode) AddWatch(watch *Watch) (string, error) {
 }
 
 func (znode *Znode) GetWatches() []*Watch {
+	// if znode.Watches != nil {
 	return znode.Watches
+	// } else {
+	// 	return []*Watch{}
+	// }
 }
 
 func (znode *Znode) SetWatches(watches []*Watch) {

@@ -76,8 +76,6 @@ func (dataTree *DataTree) CreateNode(path string, data []byte, isEph bool, epher
 	childNode := NewNode(stat, parentName, data, isEph, path, isSequence)
 	parentNode.AddChild(childName)
 	dataTree.NodeMap[path] = &childNode
-	// fmt.Printf("Inside CreateNode, parentName:%s, childName:%s, data: %d\n", parentName, childName, data)
-
 	return path, nil
 }
 
@@ -181,8 +179,8 @@ func (dataTree *DataTree) CheckWatchTrigger(transactionFragment *TransactionFrag
 
 	// Function to remove triggered watches
 	removeTriggeredWatches := func(watches []*Watch, watchType WatchType) ([]*Watch, []*Watch) {
-		var remainingWatches []*Watch
-		var triggeredWatches []*Watch
+		remainingWatches := []*Watch{}
+		triggeredWatches := []*Watch{}
 
 		// Iterate over watches and filter triggered and remaining watches
 		for _, watch := range watches {
@@ -196,9 +194,9 @@ func (dataTree *DataTree) CheckWatchTrigger(transactionFragment *TransactionFrag
 		return remainingWatches, triggeredWatches
 	}
 
-	var remainingWatches []*Watch
-	var triggeredWatches []*Watch
-	var triggered []*Watch
+	remainingWatches := []*Watch{}
+	triggeredWatches := []*Watch{}
+	triggered := []*Watch{}
 
 	switch transactionFragment.Type {
 	case OperationType_WRITE, OperationType_DELETE, OperationType_UPDATE:

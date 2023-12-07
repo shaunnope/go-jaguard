@@ -62,10 +62,11 @@ func (s *Server) HandleClientCUDS(ctx context.Context, in *pb.CUDSRequest) (*pb.
 		log.Printf("server %d get quorum", s.Id)
 
 		transaction := msg.Transaction.Extract()
+		executedPath := transaction.Path
 		var err error
 		if in.OperationType != pb.OperationType_SYNC {
+			transactionFrag := msg.Transaction.ExtractLog()
 			if in.OperationType == pb.OperationType_DELETE || in.OperationType == pb.OperationType_UPDATE {
-				transactionFrag := msg.Transaction.ExtractLog()
 				watchesTriggered := s.Data.CheckWatchTrigger(&transactionFrag)
 				for i := 0; i < len(watchesTriggered); i++ {
 					TriggerWatch(watchesTriggered[i], in.OperationType)
@@ -74,9 +75,9 @@ func (s *Server) HandleClientCUDS(ctx context.Context, in *pb.CUDSRequest) (*pb.
 			if transaction.Type == pb.OperationType_UPDATE {
 				fmt.Printf("Transaction's Data update with %s\n", transaction.Data)
 			}
-			err = s.ZabDeliver(msg.Transaction.Extract())
+			transactionFrag.Path, err = s.ZabDeliver(msg.Transaction.Extract())
+			executedPath = transactionFrag.Path
 			if in.OperationType == pb.OperationType_WRITE {
-				transactionFrag := msg.Transaction.ExtractLog()
 				watchesTriggered := s.Data.CheckWatchTrigger(&transactionFrag)
 				for i := 0; i < len(watchesTriggered); i++ {
 					TriggerWatch(watchesTriggered[i], in.OperationType)
@@ -97,11 +98,11 @@ func (s *Server) HandleClientCUDS(ctx context.Context, in *pb.CUDSRequest) (*pb.
 
 		accepted := true
 		// commit
-		return &pb.CUDSResponse{Accept: &accepted}, err
+		return &pb.CUDSResponse{Accept: &accepted, Path: &executedPath}, err
 	default:
 		log.Printf("server %d is in %s state", s.Id, state)
 		accepted := false
-		return &pb.CUDSResponse{Accept: &accepted}, nil
+		return &pb.CUDSResponse{Accept: &accepted, Path: &in.Path}, nil
 	}
 
 }
