@@ -162,6 +162,9 @@ service Node {
     rpc Commit (ZabRequest) returns (Ping);
 
     rpc SendZabRequest (ZabRequest) returns (ZabAck);
+
+    // Leader recovery
+    rpc GetLeaderInfo (Ping) returns (FollowerInfo);
     
     // Client Read Operations
     rpc GetData(GetDataRequest) returns (GetDataResponse);

@@ -307,7 +307,7 @@ func (s *Server) ProcessFollowerInfo() {
 				// slog.Info("New Node Client", s.Connections[to])
 				msg := &pb.NewLeader{LastZxid: s.LastZxid.Raw(), History: s.History.Raw()}
 				if r, err := SendGrpc(pb.NodeClient.ProposeLeader,
-					s, to, msg, *maxTimeout*3); err == nil {
+					s, to, msg, *maxTimeout*10); err == nil {
 					// update leader table (follower alr accepted lastzxid epoch)
 					// s.Zab.FollowerEpochs[int(in.Id)] = s.LastZxid.Epoch
 					s.Zab.FollowerEpochs[to] = int(r.Epoch)
@@ -355,16 +355,37 @@ func (s *Server) ZabStart(t0 int) error {
 }
 
 func (s *Server) ZabRecover() error {
-	slog.Info("Recovery", "s", s.Id, "State", s.State)
 	s.Lock()
 	defer s.Unlock()
 	if err := s.LoadStates(); err != nil {
 		return err
 	}
+	slog.Info("Recovery", "s", s.Id, "State", s.State)
 
 	switch s.State {
 	case LEADING:
-		s.SetLastZxid(s.LastZxid.Next())
+		msg := &pb.Ping{Data: int64(s.LastZxid.Epoch)}
+		for idx := range config.Servers {
+			if idx == s.Id {
+				continue
+			}
+			if r, err := SendGrpc(pb.NodeClient.GetLeaderInfo,
+				s, idx, msg, *maxTimeout,
+			); err == nil {
+				if int(r.Id) == -1 || int(r.Id) == s.Id {
+					return errors.New("leader recovery")
+				}
+				vote := &pb.VoteFragment{Id: int(r.Id), LastZxid: r.LastZxid.Extract()}
+				if err := s.SaveState(data_STATE, vote.Marshal()); err != nil {
+					return err
+				} else {
+					s.State = FOLLOWING
+					s.Vote = *vote
+				}
+				return nil
+			}
+		}
+		return errors.New("leader recovery")
 	case FOLLOWING:
 		msg := &pb.FollowerInfo{Id: int64(s.Id), LastZxid: s.LastZxid.Raw()}
 		if _, err := SendGrpc(pb.NodeClient.InformLeader,
@@ -379,6 +400,19 @@ func (s *Server) ZabRecover() error {
 		return fmt.Errorf("invalid state: %d", s.State)
 	}
 	return nil
+}
+
+func (s *Server) GetLeaderInfo(ctx context.Context, in *pb.Ping) (*pb.FollowerInfo, error) {
+	if int(in.Data) == s.AcceptedEpoch {
+		go func() {
+			s.Reelect <- true
+		}()
+		return &pb.FollowerInfo{Id: -1, LastZxid: s.Vote.LastZxid.Raw()}, nil
+	}
+	if s.State == ELECTION {
+		return &pb.FollowerInfo{Id: -1, LastZxid: s.Vote.LastZxid.Raw()}, nil
+	}
+	return &pb.FollowerInfo{Id: int64(s.Vote.Id), LastZxid: s.Vote.LastZxid.Raw()}, nil
 }
 
 // Phase 1 of ZAB
