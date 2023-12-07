@@ -252,8 +252,8 @@ func (s *Server) ProcessFollowerInfo() {
 			}
 			return
 		case in := <-s.Zab.FollowerInfoQ:
-			slog.Info("FollowerInfo", "s", s.Id, "from", in.Id, "lastZxid", in.LastZxid.Extract())
 			s.Zab.Lock()
+			slog.Info("FollowerInfo", "s", s.Id, "from", in.Id, "lastZxid", in.LastZxid.Extract(), "counter", int(in.LastZxid.Counter))
 			switch int(in.LastZxid.Counter) {
 			case -1:
 				// phase 1
@@ -333,6 +333,8 @@ func (s *Server) Startup() {
 	s.Discovery()
 	for waitHistory {
 		s.ZabRecover()
+		// msg := &pb.FollowerInfo{Id: int64(s.Id), LastZxid: s.LastZxid.Raw()}
+		// SendGrpc(pb.NodeClient.InformLeader, s, s.Vote.Id, msg, *maxTimeout)
 		time.Sleep(time.Second)
 	}
 	slog.Info("Startup complete", "s", s.Id)
@@ -359,6 +361,11 @@ func (s *Server) ZabRecover() error {
 	defer s.Unlock()
 	if err := s.LoadStates(); err != nil {
 		return err
+	} else if s.State == LEADING {
+		// Load successfully
+		// Ensure that reload cannot
+		s.State = FOLLOWING
+		s.Vote.Id = 5
 	}
 	slog.Info("Recovery", "s", s.Id, "State", s.State)
 
@@ -418,7 +425,7 @@ func (s *Server) GetLeaderInfo(ctx context.Context, in *pb.Ping) (*pb.FollowerIn
 // Phase 1 of ZAB
 func (s *Server) Discovery() {
 	s.Lock()
-
+	slog.Info("Discovery", "s", s.Id, "State", s.State)
 	switch s.State {
 	case FOLLOWING:
 		defer s.Unlock()
