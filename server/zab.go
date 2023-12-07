@@ -219,7 +219,11 @@ func (s *Server) HandleOperation(transaction pb.TransactionFragment) (string, er
 		//Check node exists? Done here or in add into setdata method?
 		//zxid := pb.ZxidFragment{int(in.Transaction.Zxid.Epoch), int(in.Transaction.Zxid.Counter)}
 		//Version??
-		s.StateVector.Data.SetData(transaction.Path, transaction.Data, 0, transaction.Zxid)
+		_, err := s.StateVector.Data.SetData(transaction.Path, transaction.Data, 0, transaction.Zxid)
+		if err != nil {
+			log.Println(err)
+			return "", err
+		}
 		log.Printf("node at %s updated", transaction.Path)
 		return "Success", nil
 

@@ -19,12 +19,12 @@ import (
 
 var (
 	// flags
-	port       = flag.Int("port", 50000, "server port")
+	port       = flag.Int("port", 50050, "server port")
 	maxTimeout = flag.Int("maxTimeout", 100000, "max timeout for election")
 )
 
 const (
-	host = "localhost"
+	host = "client"
 )
 
 func listHelp() {
@@ -103,10 +103,11 @@ Loop:
 
 			getData, err := SendClientGrpc[*pb.GetDataRequest, *pb.GetDataResponse](pb.NodeClient.GetData, &pb.GetDataRequest{Path: path, SetWatch: setWatch, ClientHost: host, ClientPort: strconv.Itoa(*port)}, *maxTimeout)
 
-			fmt.Printf("READ: %s %b\n", path, getData.Data)
 			if err != nil {
 				fmt.Printf("ERROR GET: %s\n", err)
+				break
 			}
+			fmt.Printf("READ: %s %b\n", path, getData.Data)
 
 		case "getExists":
 			fmt.Printf("Executing getExists: %s\n", &command)

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"log/slog"
 	"strings"
 	"time"
 )
@@ -114,8 +115,11 @@ func (dataTree *DataTree) DeleteNode(path string, zxid int64) (string, error) {
 }
 
 // SetData sets the data of a node by its path.
-func (dataTree *DataTree) SetData(path string, data []byte, version int64, zxid ZxidFragment) Stat {
-	node := dataTree.NodeMap[path]
+func (dataTree *DataTree) SetData(path string, data []byte, version int64, zxid ZxidFragment) (Stat, error) {
+	node, exists := dataTree.NodeMap[path]
+	if !exists {
+		return Stat{}, errors.New("node does not exist")
+	}
 	node.SetData(data)
 
 	stat := node.GetStat()
@@ -124,7 +128,7 @@ func (dataTree *DataTree) SetData(path string, data []byte, version int64, zxid 
 	stat.Version = version
 
 	outStat := CopyStat(stat)
-	return outStat
+	return outStat, nil
 }
 
 // GetNodeChildren gets all children of a node
@@ -149,7 +153,10 @@ func (dataTree *DataTree) GetNode(path string) (*Znode, error) {
 
 // GetData gets all data of a node
 func (dataTree *DataTree) GetData(path string) ([]byte, error) {
-	node := dataTree.NodeMap[path]
+	node, exists := dataTree.NodeMap[path]
+	if !exists {
+		return nil, errors.New("node does not exist")
+	}
 	return node.GetData(), nil
 }
 
@@ -175,9 +182,18 @@ func (dataTree *DataTree) CheckWatchTrigger(transactionFragment *TransactionFrag
 	fmt.Printf("Checking watches on parent:%s, node:%s for transaction:%s\n", parentName, nodeName, transactionFragment)
 
 	// Get parent and current nodes from the data tree
-	// TODO: errors not used
-	parentNode, _ := dataTree.GetNode(parentName)
-	node, _ := dataTree.GetNode(transactionFragment.Path)
+	parentNode, err := dataTree.GetNode(parentName)
+	// check if parentNode exists, if no, return empty slice
+	if err != nil {
+		slog.Info("parentNode does not exist", "path", parentName)
+		return []*Watch{}
+	}
+	node, err := dataTree.GetNode(transactionFragment.Path)
+	// check if node exists, if no, return empty slice
+	if err != nil {
+		slog.Info("Node does not exist", "path", transactionFragment.Path)
+		return []*Watch{}
+	}
 
 	// Function to remove triggered watches
 	removeTriggeredWatches := func(watches []*Watch, watchType WatchType) ([]*Watch, []*Watch) {

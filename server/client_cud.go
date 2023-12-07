@@ -67,8 +67,8 @@ func (s *Server) HandleClientCUDS(ctx context.Context, in *pb.CUDSRequest) (*pb.
 			if in.OperationType == pb.OperationType_DELETE || in.OperationType == pb.OperationType_UPDATE {
 				transactionFrag := msg.Transaction.ExtractLog()
 				watchesTriggered := s.Data.CheckWatchTrigger(&transactionFrag)
-				for i := 0; i < len(watchesTriggered); i++ {
-					TriggerWatch(watchesTriggered[i], in.OperationType)
+				for _, watch := range watchesTriggered {
+					TriggerWatch(watch, in.OperationType)
 				}
 			}
 			if transaction.Type == pb.OperationType_UPDATE {
