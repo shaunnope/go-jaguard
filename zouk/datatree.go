@@ -50,6 +50,9 @@ func NewDataTree() *DataTree {
 // CreateNode creates a node by its path.
 func (dataTree *DataTree) CreateNode(path string, data []byte, isEph bool, ephermeralOwner int64, zxid ZxidFragment, isSequence bool) (string, error) {
 	lastSlashIndex := strings.LastIndex(path, PATH_SEP)
+	if lastSlashIndex == -1 {
+		return path, errors.New("invalid path")
+	}
 	parentName := getParentName(path, lastSlashIndex)
 
 	// Check if parent node is ephemeral, return error if ephemeral
@@ -91,6 +94,9 @@ func (dataTree *DataTree) DeleteNode(path string, zxid int64) (string, error) {
 	}
 
 	lastSlashIndex := strings.LastIndex(path, PATH_SEP)
+	if lastSlashIndex == -1 {
+		return path, errors.New("invalid path")
+	}
 	parentName := path[:lastSlashIndex]
 	if parentName == "" {
 		parentName = "/"
@@ -173,6 +179,9 @@ func (dataTree *DataTree) AddWatchToNode(path string, watch *Watch) (string, err
 func (dataTree *DataTree) CheckWatchTrigger(transactionFragment *TransactionFragment) []*Watch {
 	// Extract parentName and nodeName from the path
 	lastSlashIndex := strings.LastIndex(transactionFragment.Path, PATH_SEP)
+	if lastSlashIndex == -1 {
+		return []*Watch{}
+	}
 	parentName := getParentName(transactionFragment.Path, lastSlashIndex)
 	nodeName := transactionFragment.Path[lastSlashIndex:]
 
