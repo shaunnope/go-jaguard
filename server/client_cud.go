@@ -50,13 +50,14 @@ func (s *Server) HandleClientCUDS(ctx context.Context, in *pb.CUDSRequest) (*pb.
 		}
 		for idx := range s.Zab.FollowerEpochs {
 			go func(i int) {
-				if r, err := SendGrpc(pb.NodeClient.SendZabRequest, s, i, copiedMsg, *maxTimeout*10); err == nil && r.Accept {
+				if _, err := SendGrpc(pb.NodeClient.SendZabRequest, s, i, copiedMsg, *maxTimeout*50); err == nil {
 					done <- true
 				}
 			}(idx)
 		}
 		// wait for quorum
 		for i := 0; i < majoritySize; i++ {
+			slog.Info("Need to wait for", majoritySize-i)
 			<-done
 		}
 		log.Printf("server %d get quorum", s.Id)

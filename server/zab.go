@@ -62,7 +62,8 @@ func (s *Server) ProposeLeader(ctx context.Context, in *pb.NewLeader) (*pb.AckLe
 	switch in.LastZxid {
 	case nil:
 		// phase 2
-		if s.AcceptedEpoch == int(in.Epoch) {
+		slog.Info("If nil", "s", s.Id, "s.AcceptedEpoch", s.AcceptedEpoch, "epoch", in.Epoch)
+		if s.AcceptedEpoch <= int(in.Epoch) {
 			// TODO: atomically (what does this mean?)
 			s.CurrentEpoch = int(in.Epoch)
 
@@ -102,6 +103,7 @@ func (s *Server) ProposeLeader(ctx context.Context, in *pb.NewLeader) (*pb.AckLe
 	}
 Reelect:
 	slog.Error("Leader rejected", "s", s.Id, "epoch", in.Epoch)
+	slog.Error("in.Epoch", in.Epoch, "smaller", int(in.Epoch) < s.LastZxid.Epoch, "server", s.Id, "Server Last Zxid Epoch", s.LastZxid.Epoch)
 	go func() {
 		s.Reelect <- true
 	}()
@@ -145,6 +147,8 @@ func (s *Server) SendZabRequest(ctx context.Context, in *pb.ZabRequest) (*pb.Zab
 	// if _, ok := <-s.Zab.BroadcastReady; ok {
 	// 	panic(fmt.Sprintf("%d: unexpected data on BroadcastReady", s.Id))
 	// }
+
+	slog.Info("Server", s.Id, "Get request", in.RequestType)
 
 	// Handle incoming CreateRequest
 	switch in.RequestType {
@@ -286,7 +290,8 @@ func (s *Server) ProcessFollowerInfo() {
 						// send NEWEPOCH and NEWLEADER to new follower
 						SendGrpc(pb.NodeClient.ProposeEpoch, s, to, &pb.NewEpoch{Epoch: int64(s.CurrentEpoch)}, *maxTimeout)
 
-						msg := &pb.NewLeader{Epoch: int64(s.LastZxid.Epoch), History: s.History.Raw()}
+						msg := &pb.NewLeader{Epoch: int64(s.LastZxid.Epoch) + 1, History: s.History.Raw()}
+						slog.Info("Phase 3")
 						if r, err := SendGrpc(pb.NodeClient.ProposeLeader,
 							s, to, msg, *maxTimeout,
 						); err == nil {
@@ -306,6 +311,7 @@ func (s *Server) ProcessFollowerInfo() {
 				// 1. Send NEWLEADER to follower + history (SNAP)
 				// slog.Info("New Node Client", s.Connections[to])
 				msg := &pb.NewLeader{LastZxid: s.LastZxid.Raw(), History: s.History.Raw()}
+				slog.Info("Process Follower Info")
 				if r, err := SendGrpc(pb.NodeClient.ProposeLeader,
 					s, to, msg, *maxTimeout*10); err == nil {
 					// update leader table (follower alr accepted lastzxid epoch)
@@ -489,6 +495,7 @@ func (s *Server) ZabSync() {
 	majority := len(s.Zab.FollowerEpochs)/2 + 1
 	ready := make(chan bool, majority)
 	msg := &pb.NewLeader{Epoch: int64(s.CurrentEpoch), History: s.History.Raw()}
+	slog.Info("ZabSync")
 	for i := range s.Zab.FollowerEpochs {
 		go func(idx int) {
 			if _, err := SendGrpc(pb.NodeClient.ProposeLeader,
