@@ -24,10 +24,7 @@ var (
 	maxTimeout = flag.Int("maxTimeout", 100000, "max timeout for election")
 
 	isRunningLocally = flag.Bool("l", false, "Set to true if running locally")
-)
-
-const (
-	host = "localhost"
+	host             = "localhost"
 )
 
 func listHelp() {
@@ -235,11 +232,20 @@ func main() {
 
 	// handle watch callbacks
 	// setup zkcallback server
-	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", *port))
+	var listeningIP string
+	if !*isRunningLocally {
+		host, _ = os.Hostname()
+	}
+	fmt.Printf("Host:%v\n", host)
+	fmt.Printf("Port:%v\n", *port)
+
+	listeningIP = fmt.Sprintf("%s:%d", host, *port)
+
+	lis, err := net.Listen("tcp", listeningIP)
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	} else {
-		fmt.Printf("Listening at: %v\n", *port)
+		fmt.Printf("Listening at: %v\n", listeningIP)
 	}
 	grpc_s := grpc.NewServer()
 	client := Client{}
