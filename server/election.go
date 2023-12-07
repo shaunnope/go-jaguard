@@ -197,7 +197,6 @@ func (s *Server) FastElection(t0 int) Vote {
 				}
 
 			} else {
-				log.Printf("s%d received %d out of election\n", s.Id, n.Id)
 				if int(n.Round) == s.Round {
 					receivedVotes.Put(int(n.Id), nVote, int(n.Round))
 
@@ -211,14 +210,12 @@ func (s *Server) FastElection(t0 int) Vote {
 					}
 					hasQuorum := receivedVotes.HasQuorum(nVote)
 					if int(nVote.Id) == s.Id && hasQuorum {
-						log.Printf("s%d: s%d vote has quorum 1 - %v\n", s.Id, n.Id, nVote)
 						if *leader_verbo {
 							fmt.Fprintf(file, "server %d sees that it is being followed by %d and has achieve quorum so it can prepare to vote for itself\n", s.Id, n.Id)
 						}
 						s.DeduceLeader(nVote)
 						return nVote
 					} else if _, ok := outOfElection[int(nVote.Id)]; hasQuorum && ok {
-						log.Printf("s%d: s%d vote has quorum - %v\n", s.Id, n.Id, nVote)
 						r := s.ElectNotify(nVote.Id)
 						if State(r.GetState()) == LEADING {
 							if *leader_verbo {
@@ -236,7 +233,6 @@ func (s *Server) FastElection(t0 int) Vote {
 						}
 					}
 				}
-				log.Printf("s%d put %d out of election\n", s.Id, n.Id)
 				outOfElection.Put(int(n.Id), nVote, int(n.Round))
 				hasQuorum := outOfElection.HasQuorum(nVote)
 				if int(nVote.Id) == s.Id && hasQuorum {

@@ -13,7 +13,7 @@ type Client struct {
 }
 
 func (c *Client) NotifyWatchTrigger(ctx context.Context, in *pb.WatchNotification) (*pb.WatchNotificationResponse, error) {
-	fmt.Printf("WATCH: %s @ %s\n", in.OperationType, in.Path)
+	fmt.Printf("\nWATCH: %s @ %s\n", in.OperationType, in.Path)
 	accepted := true
 	return &pb.WatchNotificationResponse{Accept: &accepted}, nil
 }

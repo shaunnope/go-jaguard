@@ -26,11 +26,16 @@ func (s *Server) HandleClientCUDS(ctx context.Context, in *pb.CUDSRequest) (*pb.
 		log.Printf("server %d received client request: %v", s.Id, in)
 		// TODO: verify version
 		// propose to all
-		s.Lock()
-		defer s.Unlock()
+		s.Zab.Lock()
+		defer s.Zab.Unlock()
+		nextZxid := s.LastZxid.Inc()
+		if nextZxid.Epoch != s.CurrentEpoch {
+			nextZxid = pb.ZxidFragment{Epoch: s.CurrentEpoch, Counter: 1}
+		}
+
 		msg := &pb.ZabRequest{
 			Transaction: &pb.Transaction{
-				Zxid:  s.LastZxid.Inc().Raw(),
+				Zxid:  nextZxid.Raw(),
 				Path:  in.Path,
 				Data:  in.Data,
 				Type:  in.OperationType,
@@ -50,8 +55,11 @@ func (s *Server) HandleClientCUDS(ctx context.Context, in *pb.CUDSRequest) (*pb.
 		}
 		for idx := range s.Zab.FollowerEpochs {
 			go func(i int) {
+				log.Printf("server %d send ZabRequest to %d", s.Id, i)
 				if r, err := SendGrpc(pb.NodeClient.SendZabRequest, s, i, copiedMsg, *maxTimeout*10); err == nil && r.Accept {
 					done <- true
+				} else {
+					fmt.Printf("server %d send ZabRequest to %d failed: %v\n", s.Id, i, err)
 				}
 			}(idx)
 		}

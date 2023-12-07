@@ -10,6 +10,7 @@ import (
 )
 
 func (s *Server) ReelectListener() {
+	done := false
 	for {
 		select {
 		case _, ok := <-s.Stop:
@@ -18,6 +19,10 @@ func (s *Server) ReelectListener() {
 			}
 			return
 		case <-s.Reelect:
+			if done {
+				return
+			}
+			done = true
 			slog.Info("Reelecting", "s", s.Id)
 			if vote := s.FastElection(*maxTimeout); vote.Id == -1 {
 				slog.Error("Election failed", "s", s.Id)
@@ -58,14 +63,6 @@ func (s *Server) Heartbeat() {
 				}
 				wg.Done()
 			}
-			// TODO: race cond on HasQuorum
-			// switch s.Zab.HasQuorum {
-			// case true:
-			// 	wg.Add(len(s.Zab.FollowerEpochs))
-			// 	for idx := range s.Zab.FollowerEpochs {
-			// 		go SendPing(idx)
-			// 	}
-			// case false:
 			wg.Add(len(config.Servers) - 1)
 			for idx := range config.Servers {
 				if idx == s.Id {
@@ -73,8 +70,7 @@ func (s *Server) Heartbeat() {
 				}
 				go SendPing(idx)
 			}
-			// }
-			// check for failed nodes
+
 			wg.Wait()
 			if len(failed) > len(config.Servers)/2 {
 				slog.Info("Lost quorum", "s", s.Id, "failed", failed)
@@ -93,7 +89,14 @@ func (s *Server) Heartbeat() {
 
 		}
 		slog.Debug("Heartbeat", "s", s.Id, "state", s.State, "vote", s.Vote)
-		time.Sleep(time.Duration(*maxTimeout) * time.Millisecond)
+		select {
+		case _, ok := <-s.Stop:
+			if ok {
+				panic(fmt.Sprintf("%d: unexpected data on Stop", s.Id))
+			}
+			return
+		case <-time.After(time.Duration(*maxTimeout) * time.Millisecond):
+		}
 	}
 }
 

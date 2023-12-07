@@ -8,6 +8,7 @@ import (
 	"log"
 	"log/slog"
 	"os"
+	"sync"
 	"time"
 
 	pb "github.com/shaunnope/go-jaguard/zouk"
@@ -37,7 +38,9 @@ func (s *Server) ProposeEpoch(ctx context.Context, in *pb.NewEpoch) (*pb.AckEpoc
 	// TODO: verify if equality is ok
 	if int(in.Epoch) >= s.AcceptedEpoch {
 		slog.Debug("Accept Epoch", "s", s.Id, "epoch", in.Epoch)
-		s.SetAcceptedEpoch(int(in.Epoch))
+		if int(in.Epoch) > s.AcceptedEpoch {
+			s.SetAcceptedEpoch(int(in.Epoch))
+		}
 		res := &pb.AckEpoch{CurrentEpoch: int64(s.AcceptedEpoch), History: s.History.Raw(), LastZxid: s.LastZxid.Raw()}
 		return res, nil
 	}
@@ -63,14 +66,15 @@ func (s *Server) ProposeLeader(ctx context.Context, in *pb.NewLeader) (*pb.AckLe
 	case nil:
 		// phase 2
 		if s.AcceptedEpoch == int(in.Epoch) {
-			// TODO: atomically (what does this mean?)
-			s.CurrentEpoch = int(in.Epoch)
+			s.Lock()
+			s.SetEpochs(int(in.Epoch))
 
 			// TODO: accept transactions in order of zxid
 
 			// update history
 			// TODO: store to non-volatile memory
 			s.ReplaceHistory(in.History)
+			s.Unlock()
 
 			slog.Debug("Accept Leader", "s", s.Id, "epoch", in.Epoch)
 			res := &pb.AckLeader{}
@@ -149,7 +153,7 @@ func (s *Server) SendZabRequest(ctx context.Context, in *pb.ZabRequest) (*pb.Zab
 	// Handle incoming CreateRequest
 	switch in.RequestType {
 	case pb.RequestType_PROPOSAL:
-		slog.Info("Proposal", "s", s.Id, "txn", in.Transaction.Extract())
+		slog.Info("Proposal", "s", s.Id, "txn", in.Transaction.Extract(), "CurrentEpoch", s.CurrentEpoch, "LastZxid", s.LastZxid)
 
 		// TODO: verify version
 		// send ack to leader
@@ -286,7 +290,7 @@ func (s *Server) ProcessFollowerInfo() {
 						// send NEWEPOCH and NEWLEADER to new follower
 						SendGrpc(pb.NodeClient.ProposeEpoch, s, to, &pb.NewEpoch{Epoch: int64(s.CurrentEpoch)}, *maxTimeout)
 
-						msg := &pb.NewLeader{Epoch: int64(s.LastZxid.Epoch), History: s.History.Raw()}
+						msg := &pb.NewLeader{Epoch: int64(s.CurrentEpoch), History: s.History.Raw()}
 						if r, err := SendGrpc(pb.NodeClient.ProposeLeader,
 							s, to, msg, *maxTimeout,
 						); err == nil {
@@ -382,6 +386,7 @@ func (s *Server) ZabRecover() error {
 					s.State = FOLLOWING
 					s.Vote = *vote
 				}
+				s.SetAcceptedEpoch(int(r.LastZxid.Extract().Epoch))
 				return nil
 			}
 		}
@@ -427,7 +432,7 @@ func (s *Server) Discovery() {
 		}
 		if _, err := SendGrpc(pb.NodeClient.InformLeader,
 			s, s.Vote.Id, msg, *maxTimeout); err != nil {
-			slog.Error("Connection Denied", "s", s.Id, "L", s.Vote.Id, "err", err)
+			s.Reelect <- true
 		}
 
 	case LEADING:
@@ -443,22 +448,37 @@ func (s *Server) Discovery() {
 		}
 		slog.Info("Max epoch", "s", s.Id, "epoch", maxEpoch)
 		s.SetEpochs(maxEpoch + 1)
+		msg := &pb.NewEpoch{Epoch: int64(s.CurrentEpoch)}
 
+		wg := sync.WaitGroup{}
+		wg.Add(len(s.Zab.FollowerEpochs))
+		lock := sync.Mutex{}
+		fails := 0
 		mostRecent := &pb.AckEpoch{CurrentEpoch: -1, History: nil, LastZxid: &pb.Zxid{Epoch: -1, Counter: -1}}
 		for idx := range s.Zab.FollowerEpochs {
-			msg := &pb.NewEpoch{Epoch: int64(s.CurrentEpoch)}
-			r, _ := SendGrpc(pb.NodeClient.ProposeEpoch, s, idx, msg, *maxTimeout)
-			// follower rejected
-			if r == nil {
-				slog.Info("follower rejected", "s", s.Id, "f", idx)
-				return
-			}
-			// TODO: extract comparison to function
-			if r.CurrentEpoch > mostRecent.CurrentEpoch || (r.CurrentEpoch == mostRecent.CurrentEpoch && !(r.LastZxid.Extract().LessThan(mostRecent.LastZxid.Extract()))) {
-				mostRecent = r
-			}
+			go func(idx int) {
+				if r, err := SendGrpc(pb.NodeClient.ProposeEpoch, s, idx, msg, *maxTimeout); err == nil {
+					lock.Lock()
+					defer lock.Unlock()
+					if r.CurrentEpoch > mostRecent.CurrentEpoch || (r.CurrentEpoch == mostRecent.CurrentEpoch && !(r.LastZxid.Extract().LessThan(mostRecent.LastZxid.Extract()))) {
+						mostRecent = r
+					}
+				} else {
+					lock.Lock()
+					defer lock.Unlock()
+					slog.Info("follower rejected", "s", s.Id, "f", idx)
+					fails += 1
+				}
+				wg.Done()
+			}(idx)
 		}
 
+		wg.Wait()
+		if fails > len(config.Servers)/2 {
+			slog.Error("Failed to get quorum", "s", s.Id)
+			s.Reelect <- true
+			return
+		}
 		log.Printf("%d most recent: %d", s.Id, mostRecent.CurrentEpoch)
 		// TODO: store to non-volatile memory
 		s.ReplaceHistory(mostRecent.History)

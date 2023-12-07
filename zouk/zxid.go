@@ -64,6 +64,17 @@ func (z *ZxidFragment) Marshal() []byte {
 	return data
 }
 
+func (f *Flag) Log() string {
+	res := ""
+	if f.IsEphemeral {
+		res += "E"
+	}
+	if f.IsSequential {
+		res += "S"
+	}
+	return res
+}
+
 type TransactionFragment struct {
 	Zxid      ZxidFragment
 	Path      string
@@ -74,7 +85,7 @@ type TransactionFragment struct {
 }
 
 func (t TransactionFragment) String() string {
-	return fmt.Sprintf("{%d %d} %s @ %s %v with flag %v", t.Zxid.Epoch, t.Zxid.Counter, t.Type, t.Path, t.Data, t.Flags)
+	return fmt.Sprintf("({%d %d} %s @ %s %v %s)", t.Zxid.Epoch, t.Zxid.Counter, t.Type, t.Path, t.Data, t.Flags)
 }
 
 type TransactionFragments struct {
