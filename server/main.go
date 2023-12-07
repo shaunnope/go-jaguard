@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"log/slog"
 	"os"
 	"strconv"
 )
@@ -47,6 +48,9 @@ func main() {
 	flag.Parse()
 	parseConfig(*configPath)
 
+	host, _ := os.Hostname()
+	slog.Info("Hostname: ", host)
+
 	if *run_locally {
 		// Run locally
 		for idx := range config.Servers {
@@ -64,6 +68,7 @@ func main() {
 	} else {
 		// Initialise each server's file as empty file
 		id, dock_err := strconv.Atoi(os.Getenv("ID"))
+		slog.Info("Host ID: ", id)
 		if dock_err != nil {
 			log.Fatalf("failed to get ID from environment: %v", dock_err)
 		}

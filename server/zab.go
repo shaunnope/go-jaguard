@@ -88,6 +88,7 @@ func (s *Server) ProposeLeader(ctx context.Context, in *pb.NewLeader) (*pb.AckLe
 		// update history
 		// TODO: reset datatree
 		// TODO: store to non-volatile memory
+		waitHistory = false
 		s.ReplaceHistory(in.History)
 
 		if err := s.ZabDeliverAll(); err != nil {
@@ -300,6 +301,7 @@ func (s *Server) ProcessFollowerInfo() {
 				to := int(in.Id)
 				// follower recovery
 				// 1. Send NEWLEADER to follower + history (SNAP)
+				slog.Info("New Node Client", s.Connections[to])
 				msg := &pb.NewLeader{LastZxid: s.LastZxid.Raw(), History: s.History.Raw()}
 				if r, err := SendGrpc(pb.NodeClient.ProposeLeader,
 					s, to, msg, *maxTimeout*3); err == nil {
@@ -316,6 +318,10 @@ func (s *Server) ProcessFollowerInfo() {
 	}
 }
 
+var (
+	waitHistory = false
+)
+
 // Routine to start Zab Session
 func (s *Server) ZabStart(t0 int) error {
 	// time.Sleep(time.Duration(10000) * time.Millisecond)
@@ -327,15 +333,21 @@ func (s *Server) ZabStart(t0 int) error {
 	} else {
 		slog.Info("Elected", "s", s.Id, "L", vote.Id)
 	}
+
 	s.WaitForLive()
 	go s.Heartbeat()
 
 	s.Discovery()
+	for waitHistory {
+		s.ZabRecover()
+		time.Sleep(time.Second)
+	}
 	slog.Info("Finished discovery", "s", s.Id)
 	return nil
 }
 
 func (s *Server) ZabRecover() error {
+	slog.Info("Recovery", "s", s.Id, "State", s.State)
 	s.Lock()
 	defer s.Unlock()
 	if err := s.LoadStates(); err != nil {
@@ -355,6 +367,7 @@ func (s *Server) ZabRecover() error {
 			slog.Error("Connection Denied", "s", s.Id, "L", s.Vote.Id, "err", err)
 			return err
 		}
+		waitHistory = true
 		slog.Debug("Connected", "s", s.Id, "L", s.Vote.Id)
 	default:
 		return fmt.Errorf("invalid state: %d", s.State)

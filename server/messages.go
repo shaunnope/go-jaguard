@@ -54,6 +54,7 @@ func SendGrpc[T pb.Message, R pb.Message](
 	}
 	for count := 0; err == nil && count < maxRetries; count++ {
 		r, err = send()
+		time.Sleep(100 * time.Microsecond)
 		if err == nil {
 			break
 		}
