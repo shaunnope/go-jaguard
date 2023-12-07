@@ -86,7 +86,6 @@ func (s *Server) ProposeLeader(ctx context.Context, in *pb.NewLeader) (*pb.AckLe
 		// TODO: implement DIFF, TRUNC. For now, just SNAP
 		// copy the snapshot received and commit the changes
 		// update history
-		// TODO: reset datatree
 		// TODO: store to non-volatile memory
 		waitHistory = false
 		s.ReplaceHistory(in.History)
@@ -305,7 +304,7 @@ func (s *Server) ProcessFollowerInfo() {
 				to := int(in.Id)
 				// follower recovery
 				// 1. Send NEWLEADER to follower + history (SNAP)
-				slog.Info("New Node Client", s.Connections[to])
+				// slog.Info("New Node Client", s.Connections[to])
 				msg := &pb.NewLeader{LastZxid: s.LastZxid.Raw(), History: s.History.Raw()}
 				if r, err := SendGrpc(pb.NodeClient.ProposeLeader,
 					s, to, msg, *maxTimeout*3); err == nil {
@@ -366,8 +365,6 @@ func (s *Server) ZabRecover() error {
 	switch s.State {
 	case LEADING:
 		s.SetLastZxid(s.LastZxid.Next())
-		// TODO: check if needed here
-		// s.Zab.Reset()
 	case FOLLOWING:
 		msg := &pb.FollowerInfo{Id: int64(s.Id), LastZxid: s.LastZxid.Raw()}
 		if _, err := SendGrpc(pb.NodeClient.InformLeader,
@@ -416,7 +413,7 @@ func (s *Server) Discovery() {
 		mostRecent := &pb.AckEpoch{CurrentEpoch: -1, History: nil, LastZxid: &pb.Zxid{Epoch: -1, Counter: -1}}
 		for idx := range s.Zab.FollowerEpochs {
 			msg := &pb.NewEpoch{Epoch: int64(s.CurrentEpoch)}
-			r, _ := SendGrpc[*pb.NewEpoch, *pb.AckEpoch](pb.NodeClient.ProposeEpoch, s, idx, msg, *maxTimeout)
+			r, _ := SendGrpc(pb.NodeClient.ProposeEpoch, s, idx, msg, *maxTimeout)
 			// follower rejected
 			if r == nil {
 				slog.Info("follower rejected", "s", s.Id, "f", idx)

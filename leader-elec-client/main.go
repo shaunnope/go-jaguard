@@ -66,7 +66,7 @@ func main() {
 func doGracefulShutdown() {
 	fmt.Println("Performing graceful shutdown tasks")
 	fmt.Printf("Attempting to delete:{%s}", nodeInQueue)
-	DeleteResponse, err := SendClientGrpc[*pb.CUDSRequest, *pb.CUDSResponse](pb.NodeClient.HandleClientCUDS, &pb.CUDSRequest{Path: nodeInQueue, Flags: &pb.Flag{IsSequential: false, IsEphemeral: false}, OperationType: pb.OperationType_DELETE}, *maxTimeout)
+	DeleteResponse, err := SendClientGrpc(pb.NodeClient.HandleClientCUDS, &pb.CUDSRequest{Path: nodeInQueue, Flags: &pb.Flag{IsSequential: false, IsEphemeral: false}, OperationType: pb.OperationType_DELETE}, *maxTimeout)
 	if err != nil {
 		fmt.Printf("Error sending delete its own leader node: %s\n", err)
 	} else {
@@ -110,7 +110,7 @@ func attemptElection() {
 	setSequential := true
 	setEphemeral := true
 
-	CUDSResponse, err := SendClientGrpc[*pb.CUDSRequest, *pb.CUDSResponse](pb.NodeClient.HandleClientCUDS, &pb.CUDSRequest{Path: path, Data: []byte(data), Flags: &pb.Flag{IsSequential: setSequential, IsEphemeral: setEphemeral}, OperationType: pb.OperationType_WRITE}, *maxTimeout)
+	CUDSResponse, err := SendClientGrpc(pb.NodeClient.HandleClientCUDS, &pb.CUDSRequest{Path: path, Data: []byte(data), Flags: &pb.Flag{IsSequential: setSequential, IsEphemeral: setEphemeral}, OperationType: pb.OperationType_WRITE}, *maxTimeout)
 
 	if err != nil {
 		log.Printf("Error sending create request: %s\n", err)
@@ -136,7 +136,7 @@ func checkIfFirst(path string) bool {
 	}
 	for i := sequenceNumber - 1; i >= 0; i-- {
 		checkPath := fmt.Sprintf("/election_%010d", i)
-		getExists, err := SendClientGrpc[*pb.GetExistsRequest, *pb.GetExistsResponse](pb.NodeClient.GetExists, &pb.GetExistsRequest{Path: checkPath, SetWatch: true, ClientHost: host, ClientPort: strconv.Itoa(*port)}, *maxTimeout)
+		getExists, err := SendClientGrpc(pb.NodeClient.GetExists, &pb.GetExistsRequest{Path: checkPath, SetWatch: true, ClientHost: host, ClientPort: strconv.Itoa(*port)}, *maxTimeout)
 		if err != nil {
 			log.Printf("Error sending read request: %s\n", err)
 		}

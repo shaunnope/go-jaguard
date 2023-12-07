@@ -50,7 +50,7 @@ func (s *Server) Heartbeat() {
 			lock := sync.Mutex{}
 			wg := sync.WaitGroup{}
 			SendPing := func(i int) {
-				_, err := SendGrpc[*pb.Ping, *pb.Ping](pb.NodeClient.SendPing, s, i, &pb.Ping{Data: int64(s.Id)}, *maxTimeout)
+				_, err := SendGrpc(pb.NodeClient.SendPing, s, i, &pb.Ping{Data: int64(s.Id)}, *maxTimeout)
 				if err != nil {
 					lock.Lock()
 					failed = append(failed, i)
@@ -84,7 +84,7 @@ func (s *Server) Heartbeat() {
 
 		case FOLLOWING:
 			// Send heartbeat to leader
-			_, err := SendGrpc[*pb.Ping, *pb.Ping](pb.NodeClient.SendPing, s, s.Vote.Id, &pb.Ping{Data: int64(s.Id)}, *maxTimeout)
+			_, err := SendGrpc(pb.NodeClient.SendPing, s, s.Vote.Id, &pb.Ping{Data: int64(s.Id)}, *maxTimeout)
 			if err != nil {
 				slog.Info("Lost leader", "s", s.Id, "leader", s.Vote)
 				s.Reelect <- true

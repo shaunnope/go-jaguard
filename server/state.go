@@ -221,5 +221,6 @@ func (sv *StateVector) SetLastZxid(zxid pb.ZxidFragment) {
 }
 
 func (sv *StateVector) ReplaceHistory(history []*pb.Transaction) {
+	sv.Data = pb.NewDataTree()
 	sv.History.Set(pb.Transactions(history).ExtractAll())
 }

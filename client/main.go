@@ -86,7 +86,7 @@ Loop:
 				break
 			}
 
-			getChildrenReply, err := SendClientGrpc[*pb.GetChildrenRequest, *pb.GetChildrenResponse](pb.NodeClient.GetChildren, &pb.GetChildrenRequest{Path: path, SetWatch: setWatch, ClientHost: host, ClientPort: strconv.Itoa(*port)}, *maxTimeout)
+			getChildrenReply, err := SendClientGrpc(pb.NodeClient.GetChildren, &pb.GetChildrenRequest{Path: path, SetWatch: setWatch, ClientHost: host, ClientPort: strconv.Itoa(*port)}, *maxTimeout)
 
 			if err != nil {
 				fmt.Printf("ERROR LS: %s\n", err)
@@ -103,7 +103,7 @@ Loop:
 				break
 			}
 
-			getData, err := SendClientGrpc[*pb.GetDataRequest, *pb.GetDataResponse](pb.NodeClient.GetData, &pb.GetDataRequest{Path: path, SetWatch: setWatch, ClientHost: host, ClientPort: strconv.Itoa(*port)}, *maxTimeout)
+			getData, err := SendClientGrpc(pb.NodeClient.GetData, &pb.GetDataRequest{Path: path, SetWatch: setWatch, ClientHost: host, ClientPort: strconv.Itoa(*port)}, *maxTimeout)
 
 			if err != nil {
 				fmt.Printf("ERROR GET: %s\n", err)
@@ -120,7 +120,7 @@ Loop:
 				break
 			}
 
-			getExists, err := SendClientGrpc[*pb.GetExistsRequest, *pb.GetExistsResponse](pb.NodeClient.GetExists, &pb.GetExistsRequest{Path: path, SetWatch: setWatch, ClientHost: host, ClientPort: strconv.Itoa(*port)}, *maxTimeout)
+			getExists, err := SendClientGrpc(pb.NodeClient.GetExists, &pb.GetExistsRequest{Path: path, SetWatch: setWatch, ClientHost: host, ClientPort: strconv.Itoa(*port)}, *maxTimeout)
 
 			if err != nil {
 				fmt.Printf("ERROR GET EXISTS: %s\n", err)
@@ -164,7 +164,7 @@ Loop:
 				}
 
 			}
-			CUDSResponse, err := SendClientGrpc[*pb.CUDSRequest, *pb.CUDSResponse](pb.NodeClient.HandleClientCUDS, &pb.CUDSRequest{Path: path, Data: []byte(data), Flags: &pb.Flag{IsSequential: setSequential, IsEphemeral: setEphemeral}, OperationType: pb.OperationType_WRITE}, *maxTimeout)
+			CUDSResponse, err := SendClientGrpc(pb.NodeClient.HandleClientCUDS, &pb.CUDSRequest{Path: path, Data: []byte(data), Flags: &pb.Flag{IsSequential: setSequential, IsEphemeral: setEphemeral}, OperationType: pb.OperationType_WRITE}, *maxTimeout)
 
 			if err != nil {
 				fmt.Printf("ERROR CREATE: %s\n", err)
@@ -183,7 +183,7 @@ Loop:
 			path := command[1]
 			data := command[2]
 
-			CUDSResponse, err := SendClientGrpc[*pb.CUDSRequest, *pb.CUDSResponse](pb.NodeClient.HandleClientCUDS, &pb.CUDSRequest{Path: path, Data: []byte(data), Flags: &pb.Flag{IsSequential: false, IsEphemeral: false}, OperationType: pb.OperationType_UPDATE}, *maxTimeout)
+			CUDSResponse, err := SendClientGrpc(pb.NodeClient.HandleClientCUDS, &pb.CUDSRequest{Path: path, Data: []byte(data), Flags: &pb.Flag{IsSequential: false, IsEphemeral: false}, OperationType: pb.OperationType_UPDATE}, *maxTimeout)
 
 			if err != nil {
 				fmt.Printf("ERROR SET: %s\n", err)
@@ -201,7 +201,7 @@ Loop:
 
 			path := command[1]
 
-			CUDSResponse, err := SendClientGrpc[*pb.CUDSRequest, *pb.CUDSResponse](pb.NodeClient.HandleClientCUDS, &pb.CUDSRequest{Path: path, Flags: &pb.Flag{IsSequential: false, IsEphemeral: false}, OperationType: pb.OperationType_DELETE}, *maxTimeout)
+			CUDSResponse, err := SendClientGrpc(pb.NodeClient.HandleClientCUDS, &pb.CUDSRequest{Path: path, Flags: &pb.Flag{IsSequential: false, IsEphemeral: false}, OperationType: pb.OperationType_DELETE}, *maxTimeout)
 
 			if err != nil {
 				fmt.Printf("ERROR DELETE: %s\n", err)
@@ -210,7 +210,7 @@ Loop:
 			}
 
 		case "sync":
-			CUDSResponse, err := SendClientGrpc[*pb.CUDSRequest, *pb.CUDSResponse](pb.NodeClient.HandleClientCUDS, &pb.CUDSRequest{Path: "", Flags: &pb.Flag{IsSequential: false, IsEphemeral: false}, OperationType: pb.OperationType_SYNC}, *maxTimeout)
+			CUDSResponse, err := SendClientGrpc(pb.NodeClient.HandleClientCUDS, &pb.CUDSRequest{Path: "", Flags: &pb.Flag{IsSequential: false, IsEphemeral: false}, OperationType: pb.OperationType_SYNC}, *maxTimeout)
 			if err != nil {
 				fmt.Printf("ERROR SYNC: %s\n", err)
 			} else {
@@ -274,10 +274,8 @@ func SendClientGrpc[T pb.Message, R pb.Message](
 ) (R, error) {
 	var err error = nil
 	var r R
-	for i := 0; i < len(addrLs); i++ {
-		serverAddr := addrLs[i]
-
-		fmt.Printf("Client attempting to connect to Zookeeper Server at %v\n", serverAddr)
+	for _, serverAddr := range addrLs {
+		// fmt.Printf("Client attempting to connect to Zookeeper Server at %v\n", serverAddr)
 
 		conn, _ := grpc.Dial(serverAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		defer conn.Close()

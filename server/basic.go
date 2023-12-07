@@ -65,7 +65,7 @@ func Simulate(s *Server, path string) {
 
 		// Preparing client to try and getChildren
 		//TODO: Have to use a call as a client using IP and port of zk server instead of calling by connections[to]
-		getChildrenReply, err := SendGrpc[*pb.GetChildrenRequest, *pb.GetChildrenResponse](pb.NodeClient.GetChildren, s, s.Vote.Id, &pb.GetChildrenRequest{Path: "/", SetWatch: false}, *maxTimeout)
+		getChildrenReply, err := SendGrpc(pb.NodeClient.GetChildren, s, s.Vote.Id, &pb.GetChildrenRequest{Path: "/", SetWatch: false}, *maxTimeout)
 		fmt.Printf("READ: %s are the children of '/'\n", getChildrenReply.Children)
 		if err != nil {
 			log.Printf("%d error sending read request: %v\n", s.Id, err)
@@ -73,14 +73,14 @@ func Simulate(s *Server, path string) {
 		}
 
 		path = "/foo"
-		getExistReply, err := SendGrpc[*pb.GetExistsRequest, *pb.GetExistsResponse](pb.NodeClient.GetExists, s, s.Vote.Id, &pb.GetExistsRequest{Path: path, SetWatch: false}, *maxTimeout)
+		getExistReply, err := SendGrpc(pb.NodeClient.GetExists, s, s.Vote.Id, &pb.GetExistsRequest{Path: path, SetWatch: false}, *maxTimeout)
 		fmt.Printf("READ: %s exists: %t\n", path, getExistReply.Exists)
 		if err != nil {
 			log.Printf("%d error sending read request: %v\n", s.Id, err)
 			return
 		}
 
-		getDataReply, err := SendGrpc[*pb.GetDataRequest, *pb.GetDataResponse](pb.NodeClient.GetData, s, s.Vote.Id, &pb.GetDataRequest{Path: path, SetWatch: false}, *maxTimeout)
+		getDataReply, err := SendGrpc(pb.NodeClient.GetData, s, s.Vote.Id, &pb.GetDataRequest{Path: path, SetWatch: false}, *maxTimeout)
 		fmt.Printf("READ: Data of %s is: %v\n", path, getDataReply.Data)
 		if err != nil {
 			log.Printf("%d error sending read request: %v\n", s.Id, err)
