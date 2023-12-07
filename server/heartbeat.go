@@ -21,7 +21,11 @@ func (s *Server) ReelectListener() {
 			slog.Info("Reelecting", "s", s.Id)
 			if vote := s.FastElection(*maxTimeout); vote.Id == -1 {
 				slog.Error("Election failed", "s", s.Id)
-				s.Stop <- true
+				close(s.Stop)
+				return
+			} else {
+				slog.Info("Elected", "s", s.Id, "L", vote.Id)
+				defer s.Startup()
 				return
 			}
 		}
@@ -106,7 +110,7 @@ func (s *Server) WaitForLive() {
 			if _, ok := done[idx]; ok {
 				continue
 			}
-			if r, err := SendGrpc[*pb.Ping, *pb.Ping](pb.NodeClient.SendPing, s, idx, &pb.Ping{Data: int64(s.Id)}, *maxTimeout); err == nil && State(r.Data) > ELECTION {
+			if r, err := SendGrpc(pb.NodeClient.SendPing, s, idx, &pb.Ping{Data: int64(s.Id)}, *maxTimeout); err == nil && State(r.Data) > ELECTION {
 				done[idx] = true
 			}
 		}

@@ -50,7 +50,7 @@ func (s *Server) HandleClientCUDS(ctx context.Context, in *pb.CUDSRequest) (*pb.
 		}
 		for idx := range s.Zab.FollowerEpochs {
 			go func(i int) {
-				if r, err := SendGrpc[*pb.ZabRequest, *pb.ZabAck](pb.NodeClient.SendZabRequest, s, i, copiedMsg, *maxTimeout); err == nil && r.Accept {
+				if r, err := SendGrpc(pb.NodeClient.SendZabRequest, s, i, copiedMsg, *maxTimeout*10); err == nil && r.Accept {
 					done <- true
 				}
 			}(idx)
@@ -68,8 +68,8 @@ func (s *Server) HandleClientCUDS(ctx context.Context, in *pb.CUDSRequest) (*pb.
 			transactionFrag := msg.Transaction.ExtractLog()
 			if in.OperationType == pb.OperationType_DELETE || in.OperationType == pb.OperationType_UPDATE {
 				watchesTriggered := s.Data.CheckWatchTrigger(&transactionFrag)
-				for i := 0; i < len(watchesTriggered); i++ {
-					TriggerWatch(watchesTriggered[i], in.OperationType)
+				for _, watch := range watchesTriggered {
+					TriggerWatch(watch, in.OperationType)
 				}
 			}
 			if transaction.Type == pb.OperationType_UPDATE {

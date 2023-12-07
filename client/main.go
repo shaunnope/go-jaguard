@@ -105,10 +105,11 @@ Loop:
 
 			getData, err := SendClientGrpc[*pb.GetDataRequest, *pb.GetDataResponse](pb.NodeClient.GetData, &pb.GetDataRequest{Path: path, SetWatch: setWatch, ClientHost: host, ClientPort: strconv.Itoa(*port)}, *maxTimeout)
 
-			fmt.Printf("READ: %s %b\n", path, getData.Data)
 			if err != nil {
 				fmt.Printf("ERROR GET: %s\n", err)
+				break
 			}
+			fmt.Printf("READ: %s %b\n", path, getData.Data)
 
 		case "getExists":
 			fmt.Printf("Executing getExists: %s\n", &command)

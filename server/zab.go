@@ -221,7 +221,11 @@ func (s *Server) HandleOperation(transaction pb.TransactionFragment) (string, er
 		//Check node exists? Done here or in add into setdata method?
 		//zxid := pb.ZxidFragment{int(in.Transaction.Zxid.Epoch), int(in.Transaction.Zxid.Counter)}
 		//Version??
-		s.StateVector.Data.SetData(transaction.Path, transaction.Data, 0, transaction.Zxid)
+		_, err := s.StateVector.Data.SetData(transaction.Path, transaction.Data, 0, transaction.Zxid)
+		if err != nil {
+			log.Println(err)
+			return "", err
+		}
 		log.Printf("node at %s updated", transaction.Path)
 		return transaction.Path, nil
 
@@ -322,6 +326,19 @@ var (
 	waitHistory = false
 )
 
+func (s *Server) Startup() {
+	slog.Info("Startup", "s", s.Id)
+	s.WaitForLive()
+	go s.Heartbeat()
+
+	s.Discovery()
+	for waitHistory {
+		s.ZabRecover()
+		time.Sleep(time.Second)
+	}
+	slog.Info("Startup complete", "s", s.Id)
+}
+
 // Routine to start Zab Session
 func (s *Server) ZabStart(t0 int) error {
 	// time.Sleep(time.Duration(10000) * time.Millisecond)
@@ -334,15 +351,7 @@ func (s *Server) ZabStart(t0 int) error {
 		slog.Info("Elected", "s", s.Id, "L", vote.Id)
 	}
 
-	s.WaitForLive()
-	go s.Heartbeat()
-
-	s.Discovery()
-	for waitHistory {
-		s.ZabRecover()
-		time.Sleep(time.Second)
-	}
-	slog.Info("Finished discovery", "s", s.Id)
+	s.Startup()
 	return nil
 }
 
@@ -464,7 +473,7 @@ func (s *Server) ZabSync() {
 	// phase 3
 	if err := s.ZabDeliverAll(); err != nil {
 		slog.Error("ZabSync", "s", s.Id, "err", err)
-		panic("failed to deliver")
+		// panic("failed to deliver")
 	}
 	if s.History.Len() == 0 {
 		s.SetLastZxid(pb.ZxidFragment{Epoch: s.CurrentEpoch})
