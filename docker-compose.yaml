@@ -105,7 +105,7 @@ services:
       dockerfile: ./client/Dockerfile
     image: zookeeper_client:latest
     ports:
-      - "50050:50050"
+      - "50050"
     networks:
       - mynetwork
     tty: true
