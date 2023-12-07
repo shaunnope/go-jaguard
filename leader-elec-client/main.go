@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math/rand"
 	"net"
 	"os"
 	"os/signal"
@@ -20,18 +21,17 @@ import (
 
 var (
 	// flags
-	port       = flag.Int("port", 50008, "server port")
-	addr       = flag.String("addr", "localhost:50056", "the address to connect to")
+	addrLs []string
+	port   = flag.Int("port", 50008, "server port")
+	// addr       = flag.String("addr", "localhost:50056", "the address to connect to")
+	joinAddr   = "localhost:50051,localhost:50052,localhost:50053,localhost:50054,localhost:50055,localhost:50056"
 	maxTimeout = flag.Int("maxTimeout", 100000, "max timeout for election")
 
 	isRunningLocally = flag.Bool("l", false, "Set to true if running locally")
 	isLeader         = false
 	electionRound    = 0
 	nodeInQueue      = ""
-)
-
-const (
-	host = "localhost"
+	host             = "localhost"
 )
 
 func main() {
@@ -46,11 +46,23 @@ func main() {
 		attemptElection()
 	}()
 
+	// handle watch callbacks
+	// setup zkcallback server
+
+	var listeningIP string
+	if !*isRunningLocally {
+		host, _ = os.Hostname()
+	}
+	fmt.Printf("Host:%v\n", host)
+	fmt.Printf("Port:%v\n", *port)
+
+	listeningIP = fmt.Sprintf("%s:%d", host, *port)
+
 	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", *port))
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	} else {
-		fmt.Printf("Listening at: %v\n", *port)
+		fmt.Printf("Listening at: %v\n", listeningIP)
 	}
 	grpc_s := grpc.NewServer()
 	client := Client{}
@@ -82,15 +94,27 @@ func SendClientGrpc[T pb.Message, R pb.Message](
 	var err error = nil
 	var r R
 
-	// Set up a connection to the server.
-	docker_addr := os.Getenv("ADDR")
-	if *isRunningLocally {
-		docker_addr = *addr
+	var addrLsStr string
+
+	// // Set up a connection to the server.
+	// docker_addr := os.Getenv("ADDR")
+	// if *isRunningLocally {
+	// 	docker_addr = *addr
+	// }
+
+	if !*isRunningLocally {
+		addrLsStr = os.Getenv("ADDR")
+	} else {
+		addrLsStr = joinAddr
 	}
+	addrLs = strings.Split(addrLsStr, ",")
+	rand.Shuffle(len(addrLs), func(i, j int) { addrLs[i], addrLs[j] = addrLs[j], addrLs[i] })
+	// fmt.Printf("Address list call order: %v\n", addrLs)
+	// connectedServer := addrLs[rand.Intn(len(addrLs))]
 
-	fmt.Printf("Client connect to Zookeeper Server at %s\n", docker_addr)
+	fmt.Printf("Client connect to Zookeeper Server at %s\n", addrLs[0])
 
-	conn, err := grpc.Dial(docker_addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.Dial(addrLs[0], grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 	}
@@ -134,8 +158,12 @@ func checkIfFirst(path string) bool {
 		fmt.Println("Error extracting X value:", err)
 		log.Fatalf("Extracted invalid sequential number %s \n", path)
 	}
+	if !*isRunningLocally {
+		host, _ = os.Hostname()
+	}
 	for i := sequenceNumber - 1; i >= 0; i-- {
 		checkPath := fmt.Sprintf("/election_%010d", i)
+		//edit host
 		getExists, err := SendClientGrpc(pb.NodeClient.GetExists, &pb.GetExistsRequest{Path: checkPath, SetWatch: true, ClientHost: host, ClientPort: strconv.Itoa(*port)}, *maxTimeout)
 		if err != nil {
 			log.Printf("Error sending read request: %s\n", err)

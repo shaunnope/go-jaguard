@@ -67,19 +67,53 @@ func SendGrpc[T pb.Message, R pb.Message](
 	return r, nil
 }
 
+// func TriggerWatch(watch *pb.Watch, operationType pb.OperationType) {
+// 	fmt.Printf("Sending watch gRPC call\n")
+// 	callbackAddr := fmt.Sprintf("%s:%s", watch.ClientAddr.Host, watch.ClientAddr.Port)
+// 	conn, err := grpc.Dial(callbackAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+// 	if err != nil {
+// 		slog.Error("TriggerWatch", "err", err)
+// 		return
+// 	}
+// 	defer conn.Close()
+
+// 	client := pb.NewZkCallbackClient(conn)
+// 	_, err = client.NotifyWatchTrigger(context.Background(), &pb.WatchNotification{Path: watch.Path, OperationType: operationType})
+// 	if err != nil {
+// 		slog.Error("TriggerWatch", "err", err)
+// 	}
+// }
+
 func TriggerWatch(watch *pb.Watch, operationType pb.OperationType) {
 	fmt.Printf("Sending watch gRPC call\n")
 	callbackAddr := fmt.Sprintf("%s:%s", watch.ClientAddr.Host, watch.ClientAddr.Port)
-	conn, err := grpc.Dial(callbackAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		slog.Error("TriggerWatch", "err", err)
+
+	// Maximum number of attempts
+	maxAttempts := 3
+	var err error
+
+	conn, dialErr := grpc.Dial(callbackAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if dialErr != nil {
+		slog.Error("TriggerWatch", "err", dialErr)
 		return
 	}
 	defer conn.Close()
 
-	client := pb.NewZkCallbackClient(conn)
-	_, err = client.NotifyWatchTrigger(context.Background(), &pb.WatchNotification{Path: watch.Path, OperationType: operationType})
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		client := pb.NewZkCallbackClient(conn)
+		_, err = client.NotifyWatchTrigger(context.Background(), &pb.WatchNotification{Path: watch.Path, OperationType: operationType})
+		if err != nil {
+			slog.Error("TriggerWatch", "err", err)
+			// Sleep for some time before retrying
+			time.Sleep(time.Second * 2)
+		} else {
+			// The gRPC call was successful, break out of the loop
+			break
+		}
+	}
+
+	// Print error after maximum attempts have been reached
 	if err != nil {
-		slog.Error("TriggerWatch", "err", err)
+		slog.Error("TriggerWatch", "err", "Max attempts reached, unable to perform gRPC call")
 	}
 }
