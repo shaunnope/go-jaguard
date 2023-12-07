@@ -110,7 +110,7 @@ services:
       - mynetwork
     tty: true
     environment:
-      - ADDR=server-0:50051
+      - ADDR='server-0:50051,server-1:50052,server-2:50053,server-3:50054,server-4:50055,server-5:50056,server-6:50057'
 
 networks:
   mynetwork:
