@@ -233,8 +233,6 @@ func main() {
 	// goroutines
 	flag.Parse()
 
-	// handle watch callbacks
-	// setup zkcallback server
 	var listeningIP string
 	if !*isRunningLocally {
 		host, _ = os.Hostname()
@@ -275,13 +273,10 @@ func SendClientGrpc[T pb.Message, R pb.Message](
 	var err error = nil
 	var r R
 	for _, serverAddr := range addrLs {
-		// fmt.Printf("Client attempting to connect to Zookeeper Server at %v\n", serverAddr)
-
 		conn, _ := grpc.Dial(serverAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		defer conn.Close()
 
 		c := pb.NewNodeClient(conn)
-
 		// Contact the server and print out its response.
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
