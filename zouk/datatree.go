@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"log/slog"
 	"strings"
 	"time"
 )
@@ -26,6 +27,7 @@ func NewDataTree() *DataTree {
 		Data:     []byte{},
 		Eph:      false,
 		Id:       PATH_SEP,
+		Watches:  []*Watch{},
 	}
 
 	dataTree := DataTree{
@@ -48,6 +50,9 @@ func NewDataTree() *DataTree {
 // CreateNode creates a node by its path.
 func (dataTree *DataTree) CreateNode(path string, data []byte, isEph bool, ephermeralOwner int64, zxid ZxidFragment, isSequence bool) (string, error) {
 	lastSlashIndex := strings.LastIndex(path, PATH_SEP)
+	if lastSlashIndex == -1 {
+		return path, errors.New("invalid path")
+	}
 	parentName := getParentName(path, lastSlashIndex)
 
 	// Check if parent node is ephemeral, return error if ephemeral
@@ -67,7 +72,7 @@ func (dataTree *DataTree) CreateNode(path string, data []byte, isEph bool, epher
 
 	childName := path[lastSlashIndex:]
 	if parentNode.ChildExists(childName) {
-		return childName, errors.New("invalid children as it already exists")
+		return childName, errors.New("invalid child. already exists")
 	}
 
 	// fmt.Printf("lastslashindex{%d}, parentName{%s}, childName:{%s}\n", lastSlashIndex, parentName, childName)
@@ -75,8 +80,6 @@ func (dataTree *DataTree) CreateNode(path string, data []byte, isEph bool, epher
 	childNode := NewNode(stat, parentName, data, isEph, path, isSequence)
 	parentNode.AddChild(childName)
 	dataTree.NodeMap[path] = &childNode
-	// fmt.Printf("Inside CreateNode, parentName:%s, childName:%s, data: %d\n", parentName, childName, data)
-
 	return path, nil
 }
 
@@ -91,15 +94,22 @@ func (dataTree *DataTree) DeleteNode(path string, zxid int64) (string, error) {
 	}
 
 	lastSlashIndex := strings.LastIndex(path, PATH_SEP)
+	if lastSlashIndex == -1 {
+		return path, errors.New("invalid path")
+	}
 	parentName := path[:lastSlashIndex]
+	if parentName == "" {
+		parentName = "/"
+	}
 	childName := path[lastSlashIndex:]
 	parentNode, ok := dataTree.NodeMap[parentName]
 	if !ok {
+		fmt.Printf("parentName:%s, childName:%s", parentName, childName)
 		return parentName, errors.New("invalid parent name")
 	}
 
 	if !parentNode.ChildExists(childName) {
-		return childName, errors.New("invalid children as it does not exists")
+		return childName, errors.New("invalid child. does not exist")
 	}
 
 	parentNode.RemoveChild(childName)
@@ -109,8 +119,11 @@ func (dataTree *DataTree) DeleteNode(path string, zxid int64) (string, error) {
 }
 
 // SetData sets the data of a node by its path.
-func (dataTree *DataTree) SetData(path string, data []byte, version int64, zxid ZxidFragment) Stat {
-	node := dataTree.NodeMap[path]
+func (dataTree *DataTree) SetData(path string, data []byte, version int64, zxid ZxidFragment) (Stat, error) {
+	node, exists := dataTree.NodeMap[path]
+	if !exists {
+		return Stat{}, errors.New("node does not exist")
+	}
 	node.SetData(data)
 
 	stat := node.GetStat()
@@ -119,7 +132,7 @@ func (dataTree *DataTree) SetData(path string, data []byte, version int64, zxid 
 	stat.Version = version
 
 	outStat := CopyStat(stat)
-	return outStat
+	return outStat, nil
 }
 
 // GetNodeChildren gets all children of a node
@@ -144,7 +157,10 @@ func (dataTree *DataTree) GetNode(path string) (*Znode, error) {
 
 // GetData gets all data of a node
 func (dataTree *DataTree) GetData(path string) ([]byte, error) {
-	node := dataTree.NodeMap[path]
+	node, exists := dataTree.NodeMap[path]
+	if !exists {
+		return nil, errors.New("node does not exist")
+	}
 	return node.GetData(), nil
 }
 
@@ -156,53 +172,79 @@ func (dataTree *DataTree) AddWatchToNode(path string, watch *Watch) (string, err
 	}
 
 	nodeAddWatch.AddWatch(watch)
+	fmt.Printf("Watch %s added\n", watch.PrintWatch())
 	return "ok", nil
 }
 
-func (dataTree *DataTree) CheckWatchTrigger(event *Event) {
-	// based on the path of the event, the client, check the parent, check what kind of event it is - like create or delete etc
-	// remove the watch
-	lastSlashIndex := strings.LastIndex(event.Path, PATH_SEP)
-	parentName := getParentName(event.Path, lastSlashIndex)
-	nodeName := event.Path[lastSlashIndex:]
-	fmt.Printf("Checking triggers with parentName:%s, nodeName:%s for zxid:%d\n", parentName, nodeName, event.Zxid)
+func (dataTree *DataTree) CheckWatchTrigger(transactionFragment *TransactionFragment) []*Watch {
+	// Extract parentName and nodeName from the path
+	lastSlashIndex := strings.LastIndex(transactionFragment.Path, PATH_SEP)
+	if lastSlashIndex == -1 {
+		return []*Watch{}
+	}
+	parentName := getParentName(transactionFragment.Path, lastSlashIndex)
+	nodeName := transactionFragment.Path[lastSlashIndex:]
 
-	parentNode, _ := dataTree.GetNode(parentName)
-	node, _ := dataTree.GetNode(event.Path)
+	// Print debug information
+	fmt.Printf("Checking watches on parent:%s, node:%s for transaction:%s\n", parentName, nodeName, transactionFragment)
+
+	// Get parent and current nodes from the data tree
+	parentNode, err := dataTree.GetNode(parentName)
+	// check if parentNode exists, if no, return empty slice
+	if err != nil {
+		slog.Info("parentNode does not exist", "path", parentName)
+		return []*Watch{}
+	}
+	node, err := dataTree.GetNode(transactionFragment.Path)
+	// check if node exists, if no, return empty slice
+	if err != nil {
+		slog.Info("Node does not exist", "path", transactionFragment.Path)
+		return []*Watch{}
+	}
 
 	// Function to remove triggered watches
-	removeTriggeredWatches := func(watches []*Watch, watchType WatchType) []*Watch {
-		var remainingWatches []*Watch
+	removeTriggeredWatches := func(watches []*Watch, watchType WatchType) ([]*Watch, []*Watch) {
+		remainingWatches := []*Watch{}
+		triggeredWatches := []*Watch{}
+
+		// Iterate over watches and filter triggered and remaining watches
 		for _, watch := range watches {
 			if watch.Type == watchType {
 				fmt.Printf("Triggered: %s\n", watch.PrintWatch())
+				triggeredWatches = append(triggeredWatches, watch)
 			} else {
 				remainingWatches = append(remainingWatches, watch)
 			}
 		}
-		return remainingWatches
+		return remainingWatches, triggeredWatches
 	}
 
-	switch event.Type {
-	case Create:
+	remainingWatches := []*Watch{}
+	triggeredWatches := []*Watch{}
+	triggered := []*Watch{}
+
+	switch transactionFragment.Type {
+	case OperationType_WRITE, OperationType_DELETE, OperationType_UPDATE:
+		// For DELETE and UPDATE, also check GetData watch
+		if transactionFragment.Type != OperationType_WRITE {
+			remainingWatches, triggered = removeTriggeredWatches(node.GetWatches(), GetData)
+			node.SetWatches(remainingWatches)
+			triggeredWatches = append(triggeredWatches, triggered...)
+		}
+
 		// Check for current node
-		node.SetWatches(removeTriggeredWatches(node.GetWatches(), Exists))
+		remainingWatches, triggered = removeTriggeredWatches(node.GetWatches(), Exists)
+		node.SetWatches(remainingWatches)
+		triggeredWatches = append(triggeredWatches, triggered...)
+
 		// Check for parent node
-		parentNode.SetWatches(removeTriggeredWatches(parentNode.GetWatches(), GetChildren))
-	case Delete:
-		// Check for current node
-		node.SetWatches(removeTriggeredWatches(node.GetWatches(), Exists))
-		node.SetWatches(removeTriggeredWatches(node.GetWatches(), GetData))
-		// Check for parent node
-		parentNode.SetWatches(removeTriggeredWatches(parentNode.GetWatches(), GetChildren))
-	case Change:
-		// Check for current node
-		node.SetWatches(removeTriggeredWatches(node.GetWatches(), Exists))
-		node.SetWatches(removeTriggeredWatches(node.GetWatches(), GetData))
-	case Child:
-		parentNode.SetWatches(removeTriggeredWatches(parentNode.GetWatches(), GetChildren))
+		remainingWatches, triggered = removeTriggeredWatches(parentNode.GetWatches(), GetChildren)
+		parentNode.SetWatches(remainingWatches)
+		triggeredWatches = append(triggeredWatches, triggered...)
 	}
-	fmt.Println("Done checking watches")
+
+	// Print debug information
+	return triggeredWatches
 }
 
 // .

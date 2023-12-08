@@ -27,15 +27,26 @@ func main() {
 		fmt.Printf("Node path has %s\n", node.PrintZnode())
 	}
 
-	getChildren(dataTree, "/node1", 0, true)
+	// GetChildren(dataTree, "/node1", zouk.Addr{Host: "", Port: ""}, true)
+	// GetData(dataTree, "/node1", zouk.Addr{Host: "", Port: ""}, true)
 
-	event := zouk.Event{
-		UserId: 0,
-		Type:   zouk.EventType(zouk.Create),
-		Path:   "/node1/node2",
+	// event := zouk.Event{
+	// 	UserId: 0,
+	// 	Type:   zouk.EventType(zouk.Create),
+	// 	Path:   "/node1/node2",
+	// }
+
+	transaction := zouk.TransactionFragment{
+		Zxid: zouk.ZxidFragment{
+			Epoch:   1,
+			Counter: 1,
+		},
+		Path:  "/node1",
+		Data:  nil,
+		Flags: nil,
+		Type:  zouk.OperationType_UPDATE,
 	}
-
-	dataTree.CheckWatchTrigger(&event)
+	dataTree.CheckWatchTrigger(&transaction)
 
 	// // Create node on top of existing root node
 	// dataTree.CreateNode("/node1", []byte{1, 2, 3, 4}, false, 1, 1, false)
@@ -76,12 +87,12 @@ func main() {
 //// clientAPI (including setting of watch)
 
 // ls /node -w -s
-func getChildren(dataTree *zouk.DataTree, path string, clientID int64, setWatch bool) (map[string]bool, error) {
+func GetChildren(dataTree *zouk.DataTree, path string, clientAddr zouk.Addr, setWatch bool) (map[string]bool, error) {
 	if setWatch {
 		watch := &zouk.Watch{
-			Type:     zouk.GetChildren,
-			Path:     path,
-			ClientId: clientID,
+			Type:       zouk.GetChildren,
+			Path:       path,
+			ClientAddr: clientAddr,
 		}
 		dataTree.AddWatchToNode(path, watch)
 	}
@@ -89,12 +100,12 @@ func getChildren(dataTree *zouk.DataTree, path string, clientID int64, setWatch 
 }
 
 // get /node
-func getData(dataTree *zouk.DataTree, path string, clientID int64, setWatch bool) ([]byte, error) {
+func GetData(dataTree *zouk.DataTree, path string, clientAddr zouk.Addr, setWatch bool) ([]byte, error) {
 	if setWatch {
 		watch := &zouk.Watch{
-			Type:     zouk.GetData,
-			Path:     path,
-			ClientId: clientID,
+			Type:       zouk.GetData,
+			Path:       path,
+			ClientAddr: clientAddr,
 		}
 		dataTree.AddWatchToNode(path, watch)
 	}
@@ -102,12 +113,12 @@ func getData(dataTree *zouk.DataTree, path string, clientID int64, setWatch bool
 }
 
 // check if exists /node
-func exists(dataTree *zouk.DataTree, path string, clientID int64, setWatch bool) (*zouk.Znode, error) {
+func Exists(dataTree *zouk.DataTree, path string, clientAddr zouk.Addr, setWatch bool) (*zouk.Znode, error) {
 	if setWatch {
 		watch := &zouk.Watch{
-			Type:     zouk.Exists,
-			Path:     path,
-			ClientId: clientID,
+			Type:       zouk.Exists,
+			Path:       path,
+			ClientAddr: clientAddr,
 		}
 		dataTree.AddWatchToNode(path, watch)
 	}

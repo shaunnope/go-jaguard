@@ -3,6 +3,7 @@ package zouk
 import (
 	"errors"
 	"fmt"
+	"sort"
 )
 
 type Stat struct {
@@ -59,11 +60,25 @@ func (znode *Znode) ChildExists(childName string) bool {
 	return exists
 }
 
-func (znode *Znode) GetChildren() map[string]bool {
-	copyChildren := map[string]bool{}
-	for key, value := range znode.Children {
-		copyChildren[key] = value
+func sortMapByKey(copyChildren map[string]bool) map[string]bool {
+	keys := make([]string, 0, len(copyChildren))
+	for key := range copyChildren {
+		keys = append(keys, key)
 	}
+
+	sort.Strings(keys)
+
+	sortedCopyChildren := make(map[string]bool)
+	for _, key := range keys {
+		sortedCopyChildren[key] = copyChildren[key]
+	}
+
+	return sortedCopyChildren
+}
+
+func (znode *Znode) GetChildren() map[string]bool {
+	copyChildren := sortMapByKey(znode.Children)
+
 	return copyChildren
 }
 
@@ -137,16 +152,21 @@ func (znode *Znode) SetData(data []byte) {
 // Add Watch to the Znode + check if watch already exists
 func (znode *Znode) AddWatch(watch *Watch) (string, error) {
 	for _, clientWatch := range znode.Watches {
-		if clientWatch.ClientId == watch.ClientId && clientWatch.Type == watch.Type {
+		if clientWatch.ClientAddr == watch.ClientAddr && clientWatch.Type == watch.Type {
 			return "", errors.New("watch already exists")
 		}
 	}
 	znode.Watches = append(znode.Watches, watch)
+	// fmt.Printf("Znode %s added watch: %s to its watches \n", znode, watch.PrintWatch())
 	return "ok", nil
 }
 
 func (znode *Znode) GetWatches() []*Watch {
+	// if znode.Watches != nil {
 	return znode.Watches
+	// } else {
+	// 	return []*Watch{}
+	// }
 }
 
 func (znode *Znode) SetWatches(watches []*Watch) {

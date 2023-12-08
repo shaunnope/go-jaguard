@@ -12,18 +12,10 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-// Manual setup of server states
-func (s *Server) Setup(vote pb.VoteFragment) {
+// Setup of server connections
+func (s *Server) Setup() {
 	s.Lock()
 	defer s.Unlock()
-	s.Vote = vote
-	if s.Id == vote.Id {
-		s.State = LEADING
-		log.Printf("server %d is leader", s.Id)
-	} else {
-		s.State = FOLLOWING
-		log.Printf("server %d is following %v", s.Id, s.Vote)
-	}
 
 	for idx := range config.Servers {
 		if idx == s.Id {
@@ -57,14 +49,14 @@ func Simulate(s *Server, path string) {
 			log.Printf("c%d error generating random data: %v", s.Id, err)
 		}
 
-		req := &pb.CUDRequest{
+		req := &pb.CUDSRequest{
 			Path:          path,
 			Data:          data,
-			Flags:         "",
+			Flags:         &pb.Flag{IsSequential: false, IsEphemeral: false},
 			OperationType: pb.OperationType_WRITE,
 		}
 
-		cudReply, err := c.HandleClientCUD(ctx, req)
+		cudReply, err := c.HandleClientCUDS(ctx, req)
 		if err != nil {
 			log.Printf("%d error sending zab request: %v", s.Id, err)
 		} else {
@@ -73,7 +65,7 @@ func Simulate(s *Server, path string) {
 
 		// Preparing client to try and getChildren
 		//TODO: Have to use a call as a client using IP and port of zk server instead of calling by connections[to]
-		getChildrenReply, err := SendGrpc[*pb.GetChildrenRequest, *pb.GetChildrenResponse](pb.NodeClient.GetChildren, s, s.Vote.Id, &pb.GetChildrenRequest{Path: "/", SetWatch: false}, *maxTimeout)
+		getChildrenReply, err := SendGrpc(pb.NodeClient.GetChildren, s, s.Vote.Id, &pb.GetChildrenRequest{Path: "/", SetWatch: false}, *maxTimeout)
 		fmt.Printf("READ: %s are the children of '/'\n", getChildrenReply.Children)
 		if err != nil {
 			log.Printf("%d error sending read request: %v\n", s.Id, err)
@@ -81,14 +73,14 @@ func Simulate(s *Server, path string) {
 		}
 
 		path = "/foo"
-		getExistReply, err := SendGrpc[*pb.GetExistsRequest, *pb.GetExistsResponse](pb.NodeClient.GetExists, s, s.Vote.Id, &pb.GetExistsRequest{Path: path, SetWatch: false}, *maxTimeout)
+		getExistReply, err := SendGrpc(pb.NodeClient.GetExists, s, s.Vote.Id, &pb.GetExistsRequest{Path: path, SetWatch: false}, *maxTimeout)
 		fmt.Printf("READ: %s exists: %t\n", path, getExistReply.Exists)
 		if err != nil {
 			log.Printf("%d error sending read request: %v\n", s.Id, err)
 			return
 		}
 
-		getDataReply, err := SendGrpc[*pb.GetDataRequest, *pb.GetDataResponse](pb.NodeClient.GetData, s, s.Vote.Id, &pb.GetDataRequest{Path: path, SetWatch: false}, *maxTimeout)
+		getDataReply, err := SendGrpc(pb.NodeClient.GetData, s, s.Vote.Id, &pb.GetDataRequest{Path: path, SetWatch: false}, *maxTimeout)
 		fmt.Printf("READ: Data of %s is: %v\n", path, getDataReply.Data)
 		if err != nil {
 			log.Printf("%d error sending read request: %v\n", s.Id, err)

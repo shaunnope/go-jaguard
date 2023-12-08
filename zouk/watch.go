@@ -17,13 +17,18 @@ const (
 	Exists
 )
 
+type Addr struct {
+	Host string
+	Port string
+}
+
 // Watch represents a ZooKeeper watch event with relevant information.
 type Watch struct {
-	Type     WatchType // The type of the watch event.
-	Path     string    // The path to the znode associated with the event.
-	ClientId int64
+	Type       WatchType // The type of the watch event.
+	Path       string    // The path to the znode associated with the event.
+	ClientAddr Addr
 }
 
 func (watch *Watch) PrintWatch() string {
-	return fmt.Sprintf("[[[[Watch Type: %s, Path: %s, Client ID: %d]]]]", WatchTypeMap[watch.Type], watch.Path, watch.ClientId)
+	return fmt.Sprintf("[[[[Watch Type: %s, Path: %s, Client Addr: %s]]]]", WatchTypeMap[watch.Type], watch.Path, watch.ClientAddr)
 }

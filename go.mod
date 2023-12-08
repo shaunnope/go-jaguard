@@ -4,10 +4,14 @@ go 1.21.1
 
 require (
 	github.com/shaunnope/go-jaguard/zouk v0.0.0-00010101000000-000000000000
+	github.com/shaunnope/go-jaguard/utils v0.0.0-00010101000000-000000000000
 	google.golang.org/grpc v1.58.2
 )
 
-replace github.com/shaunnope/go-jaguard/zouk => ./zouk
+replace (
+github.com/shaunnope/go-jaguard/zouk => ./zouk
+github.com/shaunnope/go-jaguard/utils => ./utils
+)
 
 require (
 	github.com/golang/protobuf v1.5.3 // indirect
