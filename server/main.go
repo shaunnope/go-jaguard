@@ -14,7 +14,6 @@ var (
 	// flags
 	configPath = flag.String("config", "config.json", "path to config file")
 	config     Config
-	idx        = flag.Int("idx", 0, "server index")
 
 	logDir = flag.String("log", "out", "path to log directory")
 

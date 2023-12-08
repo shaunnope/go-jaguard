@@ -3,51 +3,99 @@ jaguard /ˈʤæˌɡɑːd/
 - _verb_: past tense of jaga, to take care
 - _noun_: A Go implementation of ZooKeeper
 
+> I jaguard my friends' belongings while they went zouk.
+
 # Jaguard
 
 A Go implementation of [Apache Zookeper](https://zookeeper.apache.org/) Protocol for 50.041 Distributed Systems based on the [Zookeeper paper](zookeeper.pdf) and open-source Java implementation of Apache Zookeeper.
 
-- Zookeeper Client (CLI)
-- Zookeeper Server Cluster
-
+Much like ZooKeeper, Jaguard is a wait-free coordination service that maintains a tree-like data structure. It is a fault-tolerant system that provides high-availability of reads, while guaranteeing linearizable writes.
 ## Table of Contents
 - [Jaguard](#jaguard)
   - [Table of Contents](#table-of-contents)
-  - [Features](#features)
+- [Architecture](#architecture)
+- [Features](#features)
   - [Guarantees](#guarantees)
-  - [Getting Started](#getting-started)
-    - [Pre-requsites](#pre-requsites)
-    - [Build](#build)
-    - [Run](#run)
+  - [Znodes](#znodes)
+  - [Watches](#watches)
+- [Getting Started](#getting-started)
+  - [Pre-requsites](#pre-requsites)
+  - [Build](#build)
+  - [Run](#run)
+    - [Local](#local)
+    - [Docker](#docker)
   - [Design](#design)
   - [Testing](#testing)
-  - [Acknowledgement](#acknowledgement)
+- [Example Use Case](#example-use-case)
+  - [Acknowledgements](#acknowledgements)
 
-## Features
-- Znode implementation 
-- Znode read/write operations + replication across different servers for maintenance of data tree 
-- Leader re-election protocol via Zookeeper Atomic Broadcast(ZAB)
-- Ephemeral nodes
-- File Watch
-- Server recovery from previous snapshot 
+# Architecture
+There are two main components to Jaguard: the **Jaguard clients** and the **Zouk servers**.
+
+1. **Jaguard clients**: the user interface to the system. Clients can create, delete and set data on znodes, as well as get notifications when znodes are changed.
+2. **Zouk servers**: the nodes that make up the distributed system. They maintain a sequentially consistent data tree and process client requests.
+
+
+# Features
+The Jaguard service supports the following features:
 
 ## Guarantees
-- Linearizable Write
+- Linearizable Write: Writes are linearizable and atomic
 - Wait-free Read: Fast reading from another non-leader node 
 - Fault tolerance: Consistency despite adversarial conditions 
-- FIFO client ordering
+- FIFO client ordering: Requests from a client are executed in the order that they were sent
 
-## Getting Started
-### Pre-requsites
+## Znodes
+Znodes are the nodes that make up the data tree. They are similar to files and directories in a file system. Each znode has a path, data and a set of children znodes. Jaguard provides reliable read and write operations on znodes, and ensures a sequentially consistent replication of the data tree across all servers.
+
+## Watches
+Watches are notifications that are sent to clients when the data or state of a znode is changed. Clients can set watches on znodes to receive notifications when the znode is changed. Watches are one-time triggers, and are automatically removed after they are triggered.
+
+
+# Getting Started
+## Pre-requsites
 - Go 1.21
 - grpc-go
-### Build
-The `*.pb.go` files are currently ignored by git. To generate them, run
-```bash
-$ ./build.sh
+- protobuf
+
+We assume that the working directory is the root of the project.
+
+## Build
+To generate the protobuf files, run
+```shell
+./build.sh
 ```
-### Run
-Then, run `make cli` to start the client and `make puppet` to start the Zookeper cluster.
+## Run
+Jaguard can be run both locally and within Docker containers. While containers are recommended for demonstrating the fault-tolerance of the system, the functionality of the system can be emulated locally.
+
+### Local
+To run the servers locally, execute the following command.
+
+```shell
+go run ./server -local [-config=config.json] [-log=out] [-maxTimeout=1000]
+```
+
+- `-local` : Run the servers locally
+- `-config` : Path to the config file. Defaults to `config.json`
+- `-log` : Path to the directory for persistent storage. Defaults to `./out`
+- `-maxTimeout` : Maximum timeout for messages. Defaults to `1000` ms
+
+You can then interact with the servers using the client. To run a client, execute the following command.
+
+```shell
+go run ./client -l [-port=50000] [-maxTimeout=100000]
+```
+
+- `-l` : Run the client locally
+- `-port` : Port to run the client on. Defaults to `50000`
+- `-maxTimeout` : Maximum timeout for messages. Defaults to `100000` ms
+
+### Docker
+We have provided a docker-compose file for running the servers and clients in a Docker Compose cluster. To spin up the Docker Compose network, execute the following command.
+
+```shell
+docker compose up
+```
 
 ## Design 
 Read about the project structure, design considerations and issues in [DESIGN.md](DESIGN.md).
@@ -122,7 +170,11 @@ func SendGrpc[T pb.Message, R pb.Message](
 
 This should be sufficient to tell you the general flow of the programme and entry points.
 
-## Acknowledgement
+# Example Use Case
+
+- Leader election protocol via Zookeeper Atomic Broadcast (ZAB)
+
+## Acknowledgements
 - Ivan Feng
 - Joshua Ng
 - Sean Yap
