@@ -116,7 +116,7 @@ services:
     build: 
       context: .
       dockerfile: ./leader-elec-client/Dockerfile
-    image: zookeeper_client:latest
+    image: zookeeper_leader_client:latest
     ports:
       - "50050"
     networks:
