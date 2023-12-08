@@ -15,7 +15,6 @@ Much like ZooKeeper, Jaguard is a wait-free coordination service that maintains 
   - [Table of Contents](#table-of-contents)
 - [Architecture](#architecture)
 - [Features](#features)
-  - [Guarantees](#guarantees)
   - [Znodes](#znodes)
   - [Watches](#watches)
 - [Getting Started](#getting-started)
@@ -24,10 +23,9 @@ Much like ZooKeeper, Jaguard is a wait-free coordination service that maintains 
   - [Run](#run)
     - [Local](#local)
     - [Docker](#docker)
-  - [Design](#design)
   - [Testing](#testing)
-- [Example Use Case](#example-use-case)
-  - [Acknowledgements](#acknowledgements)
+- [Example Use Case: Leader Election with Jaguard](#example-use-case-leader-election-with-jaguard)
+- [Acknowledgements](#acknowledgements)
 
 # Architecture
 There are two main components to Jaguard: the **Jaguard clients** and the **Zouk servers**.
@@ -37,9 +35,9 @@ There are two main components to Jaguard: the **Jaguard clients** and the **Zouk
 
 
 # Features
-The Jaguard service supports the following features:
+> Read about the project structure, design considerations and issues in [DESIGN.md](DESIGN.md).
 
-## Guarantees
+Jaguard supports the following features:
 - Linearizable Write: Writes are linearizable and atomic
 - Wait-free Read: Fast reading from another non-leader node 
 - Fault tolerance: Consistency despite adversarial conditions 
@@ -94,11 +92,14 @@ go run ./client -l [-port=50000] [-maxTimeout=100000]
 We have provided a docker-compose file for running the servers and clients in a Docker Compose cluster. To spin up the Docker Compose network, execute the following command.
 
 ```shell
-docker compose up
+docker compose up [--scale client=N] [--scale leader-elec-client=M]
 ```
 
-## Design 
-Read about the project structure, design considerations and issues in [DESIGN.md](DESIGN.md).
+To demonstrate the scalability of the system, we defined scalable services for the clients and leader election clients. By default, the Docker Compose network will spin up 1 client and 1 leader election client. However,
+you can scale the number of clients and leader election clients by using the `--scale` flag.
+
+
+
 
 ## Testing
 To run the servers for testing, execute the following command.
@@ -170,11 +171,21 @@ func SendGrpc[T pb.Message, R pb.Message](
 
 This should be sufficient to tell you the general flow of the programme and entry points.
 
-# Example Use Case
+# Example Use Case: Leader Election with Jaguard
+In this example, we will demonstrate how Jaguard can be used to elect a leader within a group of clients. We will be using the Docker Compose network to demonstrate the fault-tolerance of the system.
+
+1. Start the Docker Compose network with 3 or more leader election clients.
+```shell
+docker compose up --scale leader-elec-client=3
+```
+2. Start the leader election clients.
+```shell
+docker exec -it go-jaguard-leader-elec-client_1 go run client_main.go -l
+```
 
 - Leader election protocol via Zookeeper Atomic Broadcast (ZAB)
 
-## Acknowledgements
+# Acknowledgements
 - Ivan Feng
 - Joshua Ng
 - Sean Yap
