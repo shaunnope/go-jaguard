@@ -367,12 +367,12 @@ func (s *Server) ZabRecover() error {
 	defer s.Unlock()
 	if err := s.LoadStates(); err != nil {
 		return err
-	} else if s.State == LEADING {
-		// Load successfully
-		// Ensure that reload cannot
-		s.State = FOLLOWING
-		s.Vote.Id = 5
-	}
+	} // else if s.State == LEADING {
+	// 	// Load successfully
+	// 	// Ensure that reload cannot
+	// 	s.State = FOLLOWING
+	// 	s.Vote.Id = 5
+	// }
 	slog.Info("Recovery", "s", s.Id, "State", s.State)
 
 	switch s.State {
