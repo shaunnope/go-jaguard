@@ -20,8 +20,10 @@ import (
 
 var (
 	// flags
-	addrLs     []string
-	port       = flag.Int("port", 50000, "server port")
+	addrLs []string
+	port   = flag.Int("port", 50000, "server port")
+	// joinAddr   = "localhost:50051,localhost:50052"
+	// joinAddr   = "localhost:50051,localhost:50052,localhost:50053,localhost:50054"
 	joinAddr   = "localhost:50051,localhost:50052,localhost:50053,localhost:50054,localhost:50055,localhost:50056"
 	maxTimeout = flag.Int("maxTimeout", 100000, "max timeout for election")
 
