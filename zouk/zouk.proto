@@ -1,0 +1,180 @@
+syntax = "proto3";
+option go_package = "github.com/shaunnope/go-jaguard/zouk";
+
+enum OperationType {
+    READ = 0;
+    WRITE = 1;
+    DELETE = 2;
+    UPDATE = 3;
+    SYNC = 4;
+}
+
+message Zxid {
+    int64 epoch = 1;
+    int64 counter = 2;
+}
+
+message Flag {
+    bool isSequential = 1;
+    bool isEphemeral = 2;
+}
+
+message Transaction {
+    Zxid zxid = 1;
+    string path = 2;
+    bytes data = 3;
+    Flag flags = 4;
+    OperationType type = 5;
+}
+
+message Ping {
+    int64 data = 1;
+}
+
+// election
+message Vote {
+    Zxid lastZxid = 1;
+    int64 id = 2;
+}
+
+message ElectNotification {
+    Vote vote = 1;
+    int64 id = 2;
+    int64 state = 3;
+    int64 round = 4;
+}
+
+message ElectResponse {
+    int64 state = 1;
+}
+// end election
+
+// zab
+message FollowerInfo {
+    int64 id = 1;
+    Zxid lastZxid = 2;
+}
+
+message NewEpoch {
+    int64 epoch = 1;
+}
+
+message AckEpoch {
+    int64 currentEpoch = 1;
+    repeated Transaction history = 2;
+    Zxid lastZxid = 3;
+}
+
+message NewLeader {
+    int64 epoch = 1;
+    repeated Transaction history = 2;
+    Zxid lastZxid = 3;
+}
+
+message AckLeader {
+    int64 epoch = 1;
+    repeated Transaction history = 2;
+}
+
+// end zab
+
+// read/write
+
+message ZabRequest {
+    Transaction transaction = 1;
+    RequestType requestType = 2;
+}
+
+message ZabAck {
+    ZabRequest request = 1;
+    bool accept = 2;
+}
+
+enum RequestType{
+    PROPOSAL = 0;
+    ANNOUNCEMENT = 1;
+}
+
+// client read operations
+message GetDataRequest {
+    string path = 1;
+    bool setWatch = 2;
+    string clientHost = 3;
+    string clientPort = 4;
+}
+
+message GetDataResponse {
+    bytes data = 1;
+    Zxid zxid = 3;
+}
+
+message GetChildrenRequest {
+    string path = 1;
+    bool setWatch = 2;
+    string clientHost = 3;
+    string clientPort = 4;}
+
+message GetChildrenResponse {
+    repeated string children = 1;
+    Zxid zxid = 3;
+}
+
+message GetExistsRequest {
+    string path = 1;
+    bool setWatch = 2;
+    string clientHost = 3;
+    string clientPort = 4;}
+
+message GetExistsResponse {
+    bool exists = 1;
+    Zxid zxid = 3;
+}
+
+message CUDSRequest {
+    string path = 1;
+    bytes data = 2;
+    Flag flags = 3;
+    OperationType operationType = 4;
+}
+
+message CUDSResponse {
+    optional bool accept = 1;
+    optional string path = 2;
+}
+
+message WatchNotification {
+    string path = 1;
+    OperationType operationType = 2;
+}
+
+message WatchNotificationResponse {
+    optional bool accept = 1;
+}
+
+service Node {
+    rpc SendPing (Ping) returns (Ping);
+
+    rpc Elect (ElectNotification) returns (ElectResponse);
+
+    rpc InformLeader (FollowerInfo) returns (Ping);
+    rpc ProposeEpoch (NewEpoch) returns (AckEpoch);
+    rpc ProposeLeader (NewLeader) returns (AckLeader);
+    rpc Commit (ZabRequest) returns (Ping);
+
+    rpc SendZabRequest (ZabRequest) returns (ZabAck);
+
+    // Leader recovery
+    rpc GetLeaderInfo (Ping) returns (FollowerInfo);
+    
+    // Client Read Operations
+    rpc GetData(GetDataRequest) returns (GetDataResponse);
+    rpc GetChildren(GetChildrenRequest) returns (GetChildrenResponse);
+    rpc GetExists(GetExistsRequest) returns (GetExistsResponse);
+
+    // Client CUD Operations + SYNC
+    rpc HandleClientCUDS(CUDSRequest) returns (CUDSResponse);
+}
+
+service ZkCallback {
+    rpc NotifyWatchTrigger(WatchNotification) returns (WatchNotificationResponse);
+}
